@@ -11,6 +11,9 @@ companies, geography, scoring weights, search keywords, what Haiku is
 told about the candidate) lives in five YAML files under `config/`.
 Fork, edit those files, deploy.
 
+<img width="642" height="1108" alt="image3" src="https://github.com/user-attachments/assets/fb71fc3b-cf0a-4bd2-9fd5-68c4bb9c90a7" />
+
+
 ## Quick start
 
 1. Read [`docs/FORKING.md`](./docs/FORKING.md) — the full walkthrough
