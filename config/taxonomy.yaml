@@ -1,0 +1,307 @@
+# =====================================================================
+# EXAMPLE taxonomy.yaml — classification axes for the filter UI.
+#
+# Jobs get tagged along three axes:
+#   industry        — what sector the role/company is in (multi-value)
+#   role_type       — what discipline the job is (multi-value)
+#   company_group   — curated affinity bundles (single value, derived
+#                     from companies.yaml tier assignments)
+#
+# Tagging happens at rescore time. Edits here take effect on the next
+# deploy + rescore. No Python changes required to add/remove industries.
+#
+# Copy this file to `config/taxonomy.yaml` and adjust to your preferences.
+# STRUCTURAL KEYS required by tests: `industries`, `role_types`.
+# =====================================================================
+
+# --------------------------------------------------------------------
+# industries — sector classification.
+# --------------------------------------------------------------------
+industries:
+
+  dev_tools:
+    label: "Developer Tools"
+    keywords:
+      - "developer tools"
+      - "dev tool"
+      - "developer experience"
+      - "ci/cd"
+      - "build system"
+      - "terraform"
+      - "observability"
+      - "cli tool"
+    companies:
+      - "hashicorp"
+      - "vercel"
+      - "supabase"
+      - "linear"
+      - "github"
+      - "gitlab"
+      - "circleci"
+      - "planetscale"
+      - "temporal"
+
+  saas_b2b:
+    label: "B2B SaaS"
+    keywords:
+      - "b2b saas"
+      - "enterprise saas"
+      - "business software"
+      - "customer platform"
+      - "saas platform"
+    companies:
+      - "shopify"
+      - "notion"
+      - "zendesk"
+      - "salesforce"
+      - "atlassian"
+      - "asana"
+      - "monday.com"
+
+  fintech:
+    label: "Fintech"
+    keywords:
+      - "fintech"
+      - "payments"
+      - "banking platform"
+      - "neobank"
+      - "lending platform"
+      - "fraud detection"
+      - "ledger system"
+    companies:
+      - "stripe"
+      - "plaid"
+      - "mercury"
+      - "brex"
+      - "ramp"
+      - "chime"
+
+  ai_infra:
+    label: "AI Infrastructure"
+    keywords:
+      - "foundation model"
+      - "large language model"
+      - "llm"
+      - "model serving"
+      - "inference infrastructure"
+      - "fine-tuning"
+      - "ml platform"
+    companies:
+      - "anthropic"
+      - "openai"
+      - "modal"
+      - "replicate"
+      - "baseten"
+      - "together ai"
+
+  data_infra:
+    label: "Data Infrastructure"
+    keywords:
+      - "data platform"
+      - "data warehouse"
+      - "data lake"
+      - "streaming data"
+      - "kafka"
+      - "snowpipe"
+    companies:
+      - "databricks"
+      - "snowflake"
+      - "confluent"
+      - "fivetran"
+      - "dbt labs"
+
+  cloud_infra:
+    label: "Cloud Infrastructure"
+    keywords:
+      - "cloud platform"
+      - "kubernetes"
+      - "container orchestration"
+      - "serverless"
+      - "iaas"
+      - "paas"
+    companies:
+      - "aws"
+      - "amazon web services"
+      - "google cloud"
+      - "microsoft azure"
+      - "cloudflare"
+      - "fastly"
+
+  enterprise:
+    label: "Enterprise"
+    keywords:
+      - "enterprise software"
+      - "compliance platform"
+      - "identity platform"
+      - "iam"
+    companies:
+      - "okta"
+      - "workday"
+      - "servicenow"
+      - "oracle"
+      - "sap"
+
+  healthcare_tech:
+    label: "Healthcare Tech"
+    keywords:
+      - "healthtech"
+      - "digital health"
+      - "clinical platform"
+      - "ehr integration"
+    companies:
+      - "oscar health"
+      - "flatiron health"
+      - "cedar"
+
+  other:
+    label: "Other"
+    keywords: 
+    companies: 
+
+# --------------------------------------------------------------------
+# role_types — discipline classification.
+# --------------------------------------------------------------------
+role_types:
+
+  backend_engineering:
+    label: "Backend Engineering"
+    keywords:
+      - "backend engineer"
+      - "back-end engineer"
+      - "server-side engineer"
+      - "api engineer"
+      - "go engineer"
+      - "python engineer"
+
+  platform_engineering:
+    label: "Platform Engineering"
+    keywords:
+      - "platform engineer"
+      - "infrastructure engineer"
+      - "site reliability"
+      - "sre"
+      - "devops engineer"
+      - "developer experience"
+
+  distributed_systems:
+    label: "Distributed Systems"
+    keywords:
+      - "distributed systems"
+      - "streaming systems"
+      - "database engineer"
+      - "storage engineer"
+
+  frontend_engineering:
+    label: "Frontend Engineering"
+    keywords:
+      - "frontend engineer"
+      - "front-end engineer"
+      - "ui engineer"
+      - "react engineer"
+
+  fullstack_engineering:
+    label: "Fullstack Engineering"
+    keywords:
+      - "fullstack engineer"
+      - "full stack engineer"
+      - "full-stack engineer"
+
+  mobile_engineering:
+    label: "Mobile Engineering"
+    keywords:
+      - "ios engineer"
+      - "android engineer"
+      - "react native"
+      - "mobile engineer"
+
+  data_engineering:
+    label: "Data Engineering"
+    keywords:
+      - "data engineer"
+      - "analytics engineer"
+      - "etl engineer"
+
+  ml_engineering:
+    label: "ML Engineering"
+    keywords:
+      - "machine learning engineer"
+      - "ml engineer"
+      - "applied ml"
+      - "ml platform"
+
+  security_engineering:
+    label: "Security Engineering"
+    keywords:
+      - "security engineer"
+      - "application security"
+      - "appsec"
+      - "product security"
+
+  engineering_management:
+    label: "Engineering Management"
+    keywords:
+      - "engineering manager"
+      - "director of engineering"
+      - "head of engineering"
+      - "vp of engineering"
+
+  product_management:
+    label: "Product Management"
+    keywords:
+      - "product manager"
+      - "principal pm"
+      - "group product manager"
+
+  design:
+    label: "Design"
+    keywords:
+      - "product designer"
+      - "ux designer"
+      - "design engineer"
+
+# --------------------------------------------------------------------
+# company_groups — curated affinity buckets.
+# tier_s / tier_1 / tier_2 are auto-derived from companies.yaml and
+# should NOT be duplicated here.
+# --------------------------------------------------------------------
+company_groups:
+
+  dream_culture:
+    label: "Known-good culture"
+    description: "Companies with strong engineering culture + healthy tempo."
+    companies:
+      - "stripe"
+      - "anthropic"
+      - "hashicorp"
+      - "vercel"
+      - "linear"
+
+  fintech_targets:
+    label: "Fintech"
+    description: "Fintech infrastructure you'd consider."
+    companies:
+      - "stripe"
+      - "plaid"
+      - "mercury"
+
+  dev_tools_bucket:
+    label: "Dev Tools"
+    description: "Developer tooling + CI/CD platforms."
+    companies:
+      - "hashicorp"
+      - "vercel"
+      - "supabase"
+      - "linear"
+      - "temporal"
+      - "planetscale"
+
+# --------------------------------------------------------------------
+# qol — quality-of-life weights applied by the QoL scorer.
+# --------------------------------------------------------------------
+qol:
+  salary_floor:        180000  # roles below this get a hard QoL drop
+  work_mode_remote:    25       # remote preferred for Alex
+  work_mode_hybrid:    18
+  work_mode_onsite:     5
+  crunch_penalty:      20
+  commute_distance_penalty_per_mile: 0.5

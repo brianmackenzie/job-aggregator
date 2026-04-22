@@ -1,0 +1,14 @@
+# Python deps that ship inside every Lambda zip.
+# SAM picks this up because CodeUri is `src/` and SAM looks for
+# requirements.txt at the CodeUri root.
+#
+# boto3 is intentionally omitted — it's pre-installed in the Lambda
+# runtime, and bundling it would just bloat the zip.
+requests
+feedparser
+pyyaml
+beautifulsoup4
+# Claude Haiku semantic-fit scorer. Imported lazily in
+# scoring/semantic.py so its absence in test/dev environments doesn't
+# break the algo engine. Pin lower-bound only — the SDK is stable.
+anthropic>=0.39.0

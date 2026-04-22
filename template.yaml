@@ -1,0 +1,743 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Jobs Aggregator — personal job scraping + scoring + dashboard for the original author.
+  scaffolding: DynamoDB (4 tables) + S3 (site + raw-scrape buckets) +
+  CloudFront distribution with OAC + CloudFront Function for HTTP basic auth
+  at the edge + HTTP API + stub Lambdas returning {"ok": true}.
+
+# ------------------------------------------------------------------
+# Template parameters. Values are prompted for by `sam deploy --guided`
+# on the first deploy and cached into samconfig.toml for later deploys.
+# ------------------------------------------------------------------
+Parameters:
+  BasicAuthBase64:
+    Type: String
+    NoEcho: true
+    Description: >
+      Base64 of "user:password" used by the CloudFront Function to gate
+      the entire site at the edge. Generate with:
+        echo -n 'admin:CHOOSE_PW' | base64
+
+  DomainName:
+    Type: String
+    Default: ""
+    Description: >
+      Optional custom domain (e.g. jobs.example.com). Leave empty in 
+      to use the default d###.cloudfront.net URL.
+
+  AcmCertificateArn:
+    Type: String
+    Default: ""
+    Description: >
+      Optional ACM cert ARN in us-east-1 for the custom domain. Leave empty
+      in .
+
+Conditions:
+  UseCustomDomain: !Not [!Equals [!Ref DomainName, ""]]
+
+# ------------------------------------------------------------------
+# Globals: default values applied to every Lambda in this template.
+# arm64 = Graviton2 (cheaper + faster for Python). Table names are
+# exposed via env vars so Lambda code never hardcodes them.
+# ------------------------------------------------------------------
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    Timeout: 30
+    MemorySize: 512
+    Tracing: Active
+    # every Lambda automatically gets the ConfigLayer
+    # (defined below under Resources). This mounts the five tunable YAML
+    # files at /opt/*.yaml inside the container. Loaders in src/scoring/
+    # + src/scrapers/ check /opt/<name>.yaml first, then fall back to
+    # local-dev paths. The layer's ContentUri is the repo-root config/
+    # directory — so editing config/*.yaml + `sam build && sam deploy`
+    # is the full update loop. No more src/config/ duplicate.
+    Layers:
+      - !Ref ConfigLayer
+    Environment:
+      Variables:
+        JOBS_TABLE: !Ref JobsTable
+        COMPANIES_TABLE: !Ref CompaniesTable
+        SCRAPE_RUNS_TABLE: !Ref ScrapeRunsTable
+        USER_PREFS_TABLE: !Ref UserPrefsTable
+        RAW_SCRAPE_BUCKET: !Ref RawScrapeBucket
+
+Resources:
+
+  # ==========================================================
+  # ConfigLayer — Lambda layer holding the five tunable YAMLs.
+  # Attached to every function via Globals.Function.Layers.
+  #
+  # Layout inside the layer (at /opt/ on Lambda):
+  #   /opt/candidate_profile.yaml
+  #   /opt/scoring.yaml
+  #   /opt/companies.yaml
+  #   /opt/sources.yaml
+  #   /opt/taxonomy.yaml
+  #
+  # Loaders in src/scoring/ and src/scrapers/ try /opt/<name>.yaml
+  # first, then fall back to repo-root config/<name>.yaml for local
+  # dev + pytest. The src/config/ duplicate is gone.
+  #
+  # ContentUri points directly at the repo-root config/ — SAM bundles
+  # the directory's contents as the layer payload. Layer files land
+  # under /opt/ on extraction.
+  # ==========================================================
+  ConfigLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub "${AWS::StackName}-config"
+      Description: >
+        Tunable YAML configs (candidate_profile, scoring, companies,
+        sources, taxonomy) served at /opt/*.yaml to every Lambda.
+      # ContentUri points straight at the repo-root config/ directory.
+      # No BuildMethod is set — this is a pure-content layer (no pip
+      # install, no compile step). `sam build` therefore passes the
+      # ContentUri through unchanged; `sam deploy` (via `sam package`)
+      # zips config/ and uploads it as the layer payload at deploy
+      # time. Files land under /opt/*.yaml on the Lambda filesystem.
+      ContentUri: config/
+      CompatibleRuntimes: [python3.12]
+      CompatibleArchitectures: [arm64]
+      # Delete old layer versions when the resource is replaced, so
+      # the account doesn't accumulate layers across deploys. Safe
+      # because we never pin a function to a specific layer version
+      # (Globals.Function.Layers uses !Ref, which tracks the latest).
+      RetentionPolicy: Delete
+
+  # ==========================================================
+  # DynamoDB tables — all on-demand billing (no capacity to tune)
+  # ==========================================================
+
+  # Jobs: one row per scraped job. PK is "{source}:{native_id}" to dedupe.
+  # 4 GSIs for the common access patterns used by the UI:
+  #   - ScoreIndex:       "newest high-scoring active job" feed on dashboard
+  #   - CompanyIndex:     all jobs at a given company
+  #   - SourceDateIndex:  debug: what did source X ship today?
+  #   - TrackIndex:       dashboard filter by track (gaming / media / etc.)
+  # Projection=INCLUDE keeps GSI storage small by copying only the fields
+  # the UI actually lists, not the full job description.
+  JobsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: job_id
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: score_posted
+          AttributeType: S
+        - AttributeName: company_normalized
+          AttributeType: S
+        - AttributeName: posted_at
+          AttributeType: S
+        - AttributeName: source
+          AttributeType: S
+        - AttributeName: track
+          AttributeType: S
+      KeySchema:
+        - AttributeName: job_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: ScoreIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: score_posted
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes: [title, company, url, score, posted_at, track]
+        - IndexName: CompanyIndex
+          KeySchema:
+            - AttributeName: company_normalized
+              KeyType: HASH
+            - AttributeName: posted_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes: [title, url, score, track, status]
+        - IndexName: SourceDateIndex
+          KeySchema:
+            - AttributeName: source
+              KeyType: HASH
+            - AttributeName: posted_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes: [title, company, url, score, track, status]
+        - IndexName: TrackIndex
+          KeySchema:
+            - AttributeName: track
+              KeyType: HASH
+            - AttributeName: score_posted
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes: [title, company, url, score, posted_at, status]
+
+  # Companies: tier-1 target company list. Loaded from config/companies.yaml
+  # by scripts/seed_companies.py. GSI by tier so we can fetch "all Tier S"
+  # quickly to drive the tier-grouped dashboard view.
+  CompaniesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: company_name_normalized
+          AttributeType: S
+        - AttributeName: tier
+          AttributeType: S
+      KeySchema:
+        - AttributeName: company_name_normalized
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: TierIndex
+          KeySchema:
+            - AttributeName: tier
+              KeyType: HASH
+            - AttributeName: company_name_normalized
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # ScrapeRuns: one row per scraper run for observability. TTL expires rows
+  # after ~30 days (set by the writer) to keep the table small.
+  ScrapeRunsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: source_name
+          AttributeType: S
+        - AttributeName: run_timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: source_name
+          KeyType: HASH
+        - AttributeName: run_timestamp
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+
+  # UserPrefs: free-form config blob per user_id + config_key. Used for
+  # score weights overrides, saved searches, hidden-company list, etc.
+  UserPrefsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: config_key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+        - AttributeName: config_key
+          KeyType: RANGE
+
+  # ==========================================================
+  # S3 buckets — both fully private. Only CloudFront (via OAC)
+  # can read the site bucket; the raw-scrape bucket is Lambda-only.
+  # ==========================================================
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  RawScrapeBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-raw-scrapes
+            Status: Enabled
+            ExpirationInDays: 90
+
+  # ==========================================================
+  # CloudFront OAC — the modern replacement for OAI. Signs S3
+  # requests with SigV4 so only this distribution can read the
+  # private SiteBucket.
+  # ==========================================================
+  SiteOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # ==========================================================
+  # CloudFront Function — HTTP basic auth at the edge.
+  # The base64 credential is substituted into the JS source at
+  # deploy time via Fn::Sub (CloudFront Functions cannot read
+  # stack params at runtime). The readable reference copy lives
+  # at infra/cloudfront_basic_auth.js — keep them in sync.
+  # ==========================================================
+  BasicAuthFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub "${AWS::StackName}-basicauth"
+      AutoPublish: true
+      FunctionConfig:
+        Comment: HTTP basic auth at the edge for jobs-aggregator
+        Runtime: cloudfront-js-2.0
+      FunctionCode: !Sub |
+        function handler(event) {
+          var request = event.request;
+          var headers = request.headers;
+          var expected = '${BasicAuthBase64}';
+          var got = headers.authorization && headers.authorization.value;
+          if (!got || got !== 'Basic ' + expected) {
+            return {
+              statusCode: 401,
+              statusDescription: 'Unauthorized',
+              headers: {
+                'www-authenticate': { value: 'Basic realm="jobs"' },
+                'cache-control': { value: 'no-store' }
+              }
+            };
+          }
+          return request;
+        }
+
+  # ==========================================================
+  # HTTP API — no auth at this layer (CloudFront's basic-auth
+  # function gates everything). CORS is permissive because it
+  # only matters when calling the API directly for debugging.
+  # ==========================================================
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowMethods: [GET, POST, PUT, OPTIONS]
+        AllowHeaders: [content-type, authorization]
+
+  # ==========================================================
+  # CloudFront distribution.
+  # Two behaviors:
+  #   default  -> S3 site bucket (static HTML/CSS/JS)
+  #   /api/*   -> HTTP API (Lambda)
+  # Both behaviors attach the BasicAuthFunction on viewer-request.
+  # CustomErrorResponses maps 403 (S3 key-not-found with OAC) to
+  # /index.html so deep-links / missing pages go home instead of
+  # showing an ugly XML error.
+  # ==========================================================
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+        Aliases: !If [UseCustomDomain, [!Ref DomainName], !Ref "AWS::NoValue"]
+        ViewerCertificate: !If
+          - UseCustomDomain
+          - AcmCertificateArn: !Ref AcmCertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
+        Origins:
+          - Id: site-s3
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+            OriginAccessControlId: !GetAtt SiteOAC.Id
+          - Id: api-httpapi
+            DomainName: !Sub "${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+        DefaultCacheBehavior:
+          TargetOriginId: site-s3
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          # Managed-CachingOptimized (static content)
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt BasicAuthFunction.FunctionARN
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: api-httpapi
+            ViewerProtocolPolicy: redirect-to-https
+            Compress: true
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachedMethods: [GET, HEAD]
+            # Managed-CachingDisabled (API responses change)
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            # Managed-AllViewerExceptHostHeader (pass query/headers to API)
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+            FunctionAssociations:
+              - EventType: viewer-request
+                FunctionARN: !GetAtt BasicAuthFunction.FunctionARN
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 404
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+
+  # Grant the CloudFront distribution read access to the S3 site bucket
+  # via OAC. The SourceArn condition scopes this to *this* distribution.
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontOAC
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${SiteBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+
+  # ==========================================================
+  # Lambdas.
+  # all return {"ok": true} stubs. IAM policies are sized
+  # for what each function will need in later phases so we don't
+  # churn the template every phase.
+  # ==========================================================
+
+  # GET /api/health — the one route whose stub content is non-default
+  # (it's what index.html renders in as proof of life).
+  ApiHealthFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: lambdas.api_health.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref ScrapeRunsTable }
+      Events:
+        Get:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/health
+            Method: GET
+
+  ApiStatsFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: lambdas.api_stats.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref JobsTable }
+      Events:
+        Get:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/stats
+            Method: GET
+
+  # Handles all /api/jobs* routes + /api/taxonomy via a single Lambda
+  # that switches on event.routeKey — simpler than N tiny functions.
+  # R2 added /api/jobs/browse and /api/taxonomy.
+  ApiJobsFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: lambdas.api_jobs.handler
+      # bumped 512 → 1024 MB. Lambda CPU scales linearly
+      # with memory; 1024 MB ≈ 0.6 vCPU, ~2x faster than 512 MB's 0.3 vCPU.
+      # The /browse cold path was ~7s on 10K-row scan; this should land it
+      # near 3-4s. Memory itself is overkill (we use ~120 MB) but it's the
+      # only knob Lambda exposes for CPU.
+      MemorySize: 1024
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref JobsTable }
+      Events:
+        List:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/jobs
+            Method: GET
+        Browse:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/jobs/browse
+            Method: GET
+        Get:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/jobs/{job_id}
+            Method: GET
+        Action:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/jobs/{job_id}/action
+            Method: POST
+        # bulk archive/save from the multi-select UI.
+        # Path is a literal "bulk_action" suffix (not a {job_id}) so it
+        # MUST be declared as a separate route — API Gateway HTTP API
+        # routing prefers exact paths over template paths, but only
+        # when both routes are explicitly registered. Without this
+        # entry, "POST /api/jobs/bulk_action" would 404.
+        BulkAction:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/jobs/bulk_action
+            Method: POST
+        Taxonomy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/taxonomy
+            Method: GET
+
+  ApiPrefsFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: lambdas.api_prefs.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref UserPrefsTable }
+      Events:
+        Get:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/prefs
+            Method: GET
+        Put:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/prefs
+            Method: PUT
+
+  # Scrape dispatcher: invoked by EventBridge Scheduler (daily) and also
+  # manually via POST /api/scrape/{source} for debugging. Fans out to
+  # ScrapeWorkerFn one async invoke per source.
+  ScrapeDispatcherFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: lambdas.scrape_dispatcher.handler
+      Timeout: 60
+      Environment:
+        Variables:
+          # Worker function name (CloudFormation appends a random suffix
+          # so the dispatcher can't hardcode it). Merged with Globals.
+          SCRAPE_WORKER_FN_NAME: !Ref ScrapeWorkerFn
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref ScrapeRunsTable }
+        # Fan-out: dispatcher invokes worker async (one call per source).
+        - LambdaInvokePolicy: { FunctionName: !Ref ScrapeWorkerFn }
+      Events:
+        ManualTrigger:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/scrape/{source}
+            Method: POST
+
+  # Scrape worker: actually runs one scraper. Not wired to any event in
+  # the dispatcher invokes it directly.
+  # Timeout bumped to 600s in so Apify polling has headroom even
+  # when LinkedIn is slow or the original author adds more search URLs.
+  # Bumped again to 900s (Lambda max) in because greenhouse now
+  # iterates 13+ boards, several of them 150+ postings each (Riot, Spotify,
+  # Epic), and individual put_item calls add up under DynamoDB throttling.
+  ScrapeWorkerFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: lambdas.scrape_worker.handler
+      Timeout: 900
+      MemorySize: 1024
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref JobsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref ScrapeRunsTable }
+        - DynamoDBReadPolicy: { TableName: !Ref CompaniesTable }
+        - S3WritePolicy: { BucketName: !Ref RawScrapeBucket }
+        - SSMParameterReadPolicy: { ParameterName: "jobs-aggregator/*" }
+
+  # Rescore: batch re-score all jobs after weights change. Invoked manually.
+  # also calls Claude Haiku for semantic-fit scoring; needs SSM
+  # read access for /jobs-aggregator/anthropic_api_key. Timeout bumped to
+  # 900s (15 min) — the full 4K-job table at 0.5s/Haiku call is ~33 min,
+  # so for force_semantic runs we expect to chain multiple invocations.
+  # The dry_run / skip_semantic paths still complete in <60s.
+  RescoreFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: lambdas.rescore.handler
+      Timeout: 900
+      MemorySize: 1024
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref JobsTable }
+        - DynamoDBReadPolicy: { TableName: !Ref UserPrefsTable }
+        - SSMParameterReadPolicy: { ParameterName: "jobs-aggregator/*" }
+
+  # ==========================================================
+  # EventBridge Scheduler — daily scrape at 06:00 UTC.
+  # Sources list is inline; adding a new source = template edit + redeploy.
+  # ==========================================================
+  ScrapeSchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-dispatcher
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt ScrapeDispatcherFn.Arn
+
+  DailyScrapeSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub "${AWS::StackName}-daily"
+      ScheduleExpression: "cron(0 6 * * ? *)"
+      ScheduleExpressionTimezone: UTC
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Target:
+        Arn: !GetAtt ScrapeDispatcherFn.Arn
+        RoleArn: !GetAtt ScrapeSchedulerRole.Arn
+        Input: '{"sources": ["remoteok", "himalayas", "hnhiring"]}'
+
+  # ATS scrapers run weekly (Monday 07:00 UTC) rather than daily — job boards
+  # at Greenhouse / Lever / Ashby update less frequently than RSS/JSON feeds,
+  # and the per-company HTTP calls add up quickly at daily cadence.
+  WeeklyAtsScrapeSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub "${AWS::StackName}-weekly-ats"
+      ScheduleExpression: "cron(0 7 ? * MON *)"
+      ScheduleExpressionTimezone: UTC
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Target:
+        Arn: !GetAtt ScrapeDispatcherFn.Arn
+        RoleArn: !GetAtt ScrapeSchedulerRole.Arn
+        # workday added 2026-04-18. It is opt-in per-tenant via
+        # the `workday:` block in companies.yaml; if no tenants are
+        # configured the run no-ops cleanly (logs workday_no_companies_configured).
+        # smartrecruiters added 2026-04-18. NBCUniversal was the
+        # first tenant; opt-in via `ats: smartrecruiters` + `ats_slug:` in
+        # companies.yaml (same no-op-on-empty behaviour as the others).
+        Input: '{"sources": ["greenhouse", "lever", "ashby", "workday", "smartrecruiters"]}'
+
+  # Apify LinkedIn scraper — daily at 12:00 UTC = 08:00 ET. Daily cadence
+  # matches LinkedIn's "posted in last 24h" filter we use in the search URLs;
+  # any longer cadence would miss postings.
+  DailyApifyScrapeSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub "${AWS::StackName}-daily-apify"
+      ScheduleExpression: "cron(0 12 * * ? *)"
+      ScheduleExpressionTimezone: UTC
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Target:
+        Arn: !GetAtt ScrapeDispatcherFn.Arn
+        RoleArn: !GetAtt ScrapeSchedulerRole.Arn
+        Input: '{"sources": ["apify_linkedin"]}'
+
+  # HTML/RSS/CSV sources. Daily at 06:30 UTC, 30 min after the
+  # JSON batch so they don't all hit the dispatcher at once. HTML scrapers
+  # are flakier than JSON; staggering helps with rate-limit visibility.
+  # Per the BaseScraper contract, any one source failing here doesn't
+  # affect the others.
+  DailyHtmlRssScrapeSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub "${AWS::StackName}-daily-html-rss"
+      ScheduleExpression: "cron(30 6 * * ? *)"
+      ScheduleExpressionTimezone: UTC
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Target:
+        Arn: !GetAtt ScrapeDispatcherFn.Arn
+        RoleArn: !GetAtt ScrapeSchedulerRole.Arn
+        # + 7.6 + 7.7 sources. wellfound is intentionally OMITTED
+        # (config-disabled in config/sources.yaml — anti-bot blocked,
+        # see that config slot for the full deferral rationale).
+        # bettingjobs was re-enabled 2026-04-18 via the Applyflow JSON API.
+        # The dispatcher safely no-ops on a disabled source, but listing
+        # them here just wastes invocations.
+        Input: '{"sources": ["weworkremotely", "working_nomads", "fractional_jobs", "asgc_sheet", "hitmarker", "gamesindustry", "builtinnyc", "welcometothejungle", "work_with_indies", "remote_game_jobs", "outscal", "games_jobs_direct", "sheet_rehm", "sheet_mayne", "sheet_tucker", "sheet_ploger", "bettingjobs", "games_career", "ingamejob", "game_jobs_uk"]}'
+
+# ------------------------------------------------------------------
+# Outputs: values printed after each deploy. The CloudFrontURL is the
+# one the original author loads on his iPhone.
+# ------------------------------------------------------------------
+Outputs:
+  CloudFrontURL:
+    Description: Public URL (HTTP basic auth required)
+    Value: !Sub "https://${Distribution.DomainName}"
+  ApiEndpoint:
+    Description: HTTP API direct endpoint (bypasses basic auth — keep private)
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  SiteBucketName:
+    Description: S3 bucket to upload frontend/* into
+    Value: !Ref SiteBucket
+  RawScrapeBucketName:
+    Value: !Ref RawScrapeBucket
+  JobsTableName:
+    Value: !Ref JobsTable
+  CompaniesTableName:
+    Value: !Ref CompaniesTable
+  ScrapeRunsTableName:
+    Value: !Ref ScrapeRunsTable
+  UserPrefsTableName:
+    Value: !Ref UserPrefsTable
+  ScrapeDispatcherFnName:
+    Description: Name of the dispatcher Lambda (for `aws lambda invoke` from CLI)
+    Value: !Ref ScrapeDispatcherFn
+  ScrapeWorkerFnName:
+    Description: Name of the worker Lambda (for direct invoke / log tail)
+    Value: !Ref ScrapeWorkerFn

@@ -1,0 +1,50 @@
+.aws-sam/
+.claude/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+samconfig.toml.local
+.venv/
+venv/
+.DS_Store
+node_modules/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Point-in-time data exports from scripts/export_semantic_review.py.
+# Large (multi-MB) and regenerable — never commit.
+docs/semantic_review*.md
+docs/semantic_review*.csv
+
+# Throwaway AWS CLI payload + response artifacts. Every RUNBOOK procedure
+# that invokes Lambda writes these at the repo root; they're trivially
+# regenerable from the documented commands and have no archival value.
+/out.json
+/payload.json
+/algo_out.json
+/rescore_out.json
+/rescore_seg_*.json
+/.rescore_*.json
+/smoke_*.json
+/ats_out.json
+/p7.json
+/apify_*_payload.json
+/apify_*_out.json
+/apify_*_query.json
+
+# Ad-hoc HTML dumps from scraper-tuning probes (e.g. `binyc.html`,
+# `bj_full.html`). These are pulled fresh whenever a parser breaks.
+/*.html
+
+# SAM build cache + ad-hoc tmp dirs.
+/.sam-tmp/
+/.tmp/
+/tmp_rescore/
+
+# Per-script DynamoDB scan filter JSONs — many one-off audit files,
+# never source-of-truth.
+scripts/scan_*.json
+scripts/query_*.json
