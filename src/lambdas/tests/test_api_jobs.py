@@ -374,6 +374,83 @@ def test_browse_sort_by_oldest(aws):
     assert dates == sorted(dates)  # ascending
 
 
+# --- company_asc / company_desc -------------------------------------------
+#
+# Grouping rule: primary key is company name; secondary key is score desc
+# *within* each company group. Both assertions matter — if you break the
+# secondary key, the top-of-list row for a company may no longer be its
+# highest-scoring role, which is the whole point of the grouping.
+
+def _seed_company_sort_corpus():
+    """Two companies × two roles each, with distinct scores so we can
+    verify both the primary (company) and secondary (score) orderings."""
+    # FanDuel: 90, 60
+    db.put_job(_make_job(
+        "apify:fd-hi", score=90,
+        company="FanDuel", company_normalized="fanduel",
+    ))
+    db.put_job(_make_job(
+        "apify:fd-lo", score=60,
+        company="FanDuel", company_normalized="fanduel",
+    ))
+    # Acme: 80, 50
+    db.put_job(_make_job(
+        "apify:acme-hi", score=80,
+        company="Acme Corp", company_normalized="acme corp",
+    ))
+    db.put_job(_make_job(
+        "apify:acme-lo", score=50,
+        company="Acme Corp", company_normalized="acme corp",
+    ))
+
+
+def test_browse_sort_by_company_asc(aws):
+    """Company A-Z; inside each company, score descends."""
+    _seed_company_sort_corpus()
+    resp = handler(
+        _event("GET /api/jobs/browse", qs={"sort_by": "company_asc"}),
+        None,
+    )
+    body = json.loads(resp["body"])
+    ids = [j["job_id"] for j in body["jobs"]]
+    # Acme Corp rows first (a < f), then FanDuel. Within each: hi score first.
+    assert ids == [
+        "apify:acme-hi",  # Acme 80
+        "apify:acme-lo",  # Acme 50
+        "apify:fd-hi",    # FanDuel 90
+        "apify:fd-lo",    # FanDuel 60
+    ]
+
+
+def test_browse_sort_by_company_desc(aws):
+    """Company Z-A; score still descends *within* each company group."""
+    _seed_company_sort_corpus()
+    resp = handler(
+        _event("GET /api/jobs/browse", qs={"sort_by": "company_desc"}),
+        None,
+    )
+    body = json.loads(resp["body"])
+    ids = [j["job_id"] for j in body["jobs"]]
+    # FanDuel first (f > a), then Acme. Score desc inside each — the
+    # direction of the company key must NOT flip the score direction.
+    assert ids == [
+        "apify:fd-hi",    # FanDuel 90
+        "apify:fd-lo",    # FanDuel 60
+        "apify:acme-hi",  # Acme 80
+        "apify:acme-lo",  # Acme 50
+    ]
+
+
+def test_taxonomy_lists_company_sort_options(aws):
+    """The /api/taxonomy.sort_options list must advertise both new
+    company options so the frontend dropdown picks them up."""
+    resp = handler(_event("GET /api/taxonomy"), None)
+    body = json.loads(resp["body"])
+    values = [opt["value"] for opt in body["sort_options"]]
+    assert "company_asc" in values
+    assert "company_desc" in values
+
+
 def test_browse_pagination_offset(aws):
     """Seed 5 rows, page through with limit=2."""
     for i in range(5):

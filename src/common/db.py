@@ -706,11 +706,29 @@ def query_jobs_for_browse(
                 return -1
         # default: score (the blended / final score).
         return int(j.get("score") or 0)
-
-    matched.sort(key=_sort_key, reverse=reverse if sort_by != "oldest" else False)
-    if sort_by == "oldest":
-        # `oldest` is just newest-ascending; re-sort to ignore reverse arg.
-        matched.sort(key=_sort_key, reverse=False)
+    
+    # company_asc / company_desc are a two-pass stable sort so rows
+    # cluster by company name, and inside each cluster the highest score
+    # floats to the top. Python's sort is stable, so:
+    #   pass 1 — score desc (secondary key)
+    #   pass 2 — company asc|desc (primary key)
+    # preserves the score ordering within each company group regardless
+    # of direction. Handled before the generic `_sort_key` path because
+    # that path is single-pass and can't express the compound key.
+    if sort_by in ("company_asc", "company_desc"):
+        matched.sort(
+            key=lambda j: int(j.get("score") or 0),
+            reverse=True,
+            )
+        matched.sort(
+            key=lambda j: (j.get("company") or "").strip().lower(),
+            reverse=(sort_by == "company_desc"),
+            )
+        else:
+        matched.sort(key=_sort_key, reverse=reverse if sort_by != "oldest" else False)
+        if sort_by == "oldest":
+            # `oldest` is just newest-ascending; re-sort to ignore reverse arg.
+            matched.sort(key=_sort_key, reverse=False)
 
     total = len(matched)
     page  = matched[offset : offset + limit]

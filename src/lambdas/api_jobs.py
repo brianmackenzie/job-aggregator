@@ -18,7 +18,7 @@ where multi-value):
     min_score      0-100
     min_qol        0-100
     min_salary     dollars (e.g. 250000)
-    sort_by        score | qol | comp | newest | oldest  (default: score)
+    sort_by        score | qol | comp | newest | oldest | company_asc | company_desc          (default: score)
     sort_dir       asc | desc                            (default: desc)
     limit          1-200                                  (default: 50)
     offset         0+                                     (default: 0)
@@ -174,7 +174,11 @@ def _browse(event) -> dict:
     sort_dir = (qs.get("sort_dir") or "desc").lower
     if sort_by == "semantic":
         sort_by = "score"
-    if sort_by not in {"score", "qol", "comp", "newest", "oldest"}:
+    # `company_asc` / `company_desc` group rows by company name and rank
+    # score within each group. Direction lives in the sort key itself
+    # (like newest/oldest), so sort_dir is ignored for these two.
+    if sort_by not in {"score", "qol", "comp", "newest", "oldest",
+                       "company_asc", "company_desc"}:
         sort_by = "score"
     if sort_dir not in {"asc", "desc"}:
         sort_dir = "desc"
@@ -287,12 +291,17 @@ def _taxonomy(event) -> dict:
             # backend still accepts `sort_by=semantic` for old clients
             # (it's coerced to `score` in the browse handler) — see
             # the sort-validation block at the top of this module.
-            {"value": "score",    "label": "Best match"},
-            {"value": "qol",      "label": "Quality of life"},
-            {"value": "comp",     "label": "Compensation"},
-            {"value": "newest",   "label": "Newest"},
-            {"value": "oldest",   "label": "Oldest"},
-        ],
+            {"value": "score",        "label": "Best match"},
+            {"value": "qol",          "label": "Quality of life"},
+            {"value": "comp",         "label": "Compensation"},
+            {"value": "newest",       "label": "Newest"},
+            {"value": "oldest",       "label": "Oldest"},
+            # Group by company, then rank score within each company.
+            # Useful for scanning every active role at a target employer
+            # side-by-side instead of scattered across the feed.
+            {"value": "company_asc",  "label": "Company (A\u2013Z)"},
+            {"value": "company_desc", "label": "Company (Z\u2013A)"},
+            ],
         "statuses": [
             {"value": "active",   "label": "Active"},
             {"value": "saved",    "label": "Saved"},

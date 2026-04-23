@@ -209,6 +209,18 @@
 
     // "All" — check every currently-loaded card.
     bulkSelectAllBtn.addEventListener('click',  => {
+      // Bug fix: if the user hits "All" without having toggled Select
+      // first, the cards have no <input class="bulk-check"> DOM yet —
+      // renderCard only emits checkbox markup while selectMode is true —
+      // so the two querySelectorAll loops below would be no-ops and
+      // the user would see nothing happen visually beyond the count
+      // bumping up. Enter select mode first; the re-render inside
+      // setSelectMode emits the checkboxes, then the add/check loop
+      // below takes effect. setSelectMode clears selectedIds as a side
+      // effect, so we populate the Set *after* the call.
+      if (!selectMode) {
+        setSelectMode(true);
+      }
       loadedRows.forEach(j => { if (j.job_id) selectedIds.add(j.job_id); });
       // Re-render checkbox state without refetching.
       jobCardsEl.querySelectorAll('input.bulk-check').forEach(cb => {
@@ -334,17 +346,28 @@
   /* =====================================================================
      Drawer (mobile only — desktop CSS overrides position)
      ===================================================================== */
-  function openDrawer {
-    filterRailEl.classList.add('open');
-    railBackdropEl.hidden = false;
-    void railBackdropEl.offsetWidth;
-    railBackdropEl.classList.add('show');
-  }
-  function closeDrawer {
-    filterRailEl.classList.remove('open');
-    railBackdropEl.classList.remove('show');
-    setTimeout( => { railBackdropEl.hidden = true; }, 240);
-  }
+     function openDrawer() {
+      // Bug fix: the CSS listens for `body.rail-open` on both the
+      // filter-rail (`transform: translateX(0)`) and the backdrop
+      // (`opacity: 1`). Previously we toggled `.open` on the rail element
+      // and `.show` on the backdrop element directly — no CSS rule matched
+      // those names, so on mobile the drawer never slid in (rail stayed at
+      // translateX(-100%), backdrop stayed at opacity 0). Desktop was
+      // unaffected because at ≥1024px the rail is `position: sticky` with
+      // `transform: none !important;`, overriding any transform transition.
+      document.body.classList.add('rail-open');
+      railBackdropEl.hidden = false;
+      // Force a reflow so the opacity transition runs from 0 → 1 in the
+      // next frame, instead of snapping to 1 in the same frame as the
+      // `hidden` attr removal.
+      void railBackdropEl.offsetWidth;
+    }
+    function closeDrawer() {
+      document.body.classList.remove('rail-open');
+      // Defer re-hiding the backdrop from the a11y tree until after the
+      // opacity fade completes (matches --dur-2 = 200ms, padded to 240ms).
+      setTimeout(() => { railBackdropEl.hidden = true; }, 240);
+    }
 
   /* =====================================================================
      Facet rendering — chips for industries / role_types / etc.
@@ -417,12 +440,15 @@
     // sync with src/lambdas/api_jobs.py::_taxonomy so the dropdown still
     // shows every sort option if the network hiccups during load.
     const opts = (taxonomy && taxonomy.sort_options) || [
-      { value: 'score',    label: 'Best match' },
-      { value: 'semantic', label: 'Semantic (Haiku) only' },
-      { value: 'qol',      label: 'Quality of life' },
-      { value: 'comp',     label: 'Compensation' },
-      { value: 'newest',   label: 'Newest' },
-      { value: 'oldest',   label: 'Oldest' },
+      { value: 'score',        label: 'Best match' },
+      { value: 'semantic',     label: 'Semantic (Haiku) only' },
+      { value: 'qol',          label: 'Quality of life' },
+      { value: 'comp',         label: 'Compensation' },
+      { value: 'newest',       label: 'Newest' },
+      { value: 'oldest',       label: 'Oldest' },
+      // Group by company, then rank score within each company.
+      { value: 'company_asc',  label: 'Company (A\u2013Z)' },
+      { value: 'company_desc', label: 'Company (Z\u2013A)' },
     ];
     sortSelect.innerHTML = opts.map(o =>
       `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`
