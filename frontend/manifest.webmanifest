@@ -1,0 +1,10 @@
+{
+  "name": "Jobs Aggregator",
+  "short_name": "Jobs",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "orientation": "portrait"
+}

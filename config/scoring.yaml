@@ -1,0 +1,274 @@
+# =====================================================================
+# EXAMPLE scoring.yaml — generic starter template.
+#
+# This file controls the algorithmic pre-filter and score modifiers
+# that run before Claude Haiku sees each job. In the pipeline,
+# the algo layer is a BINARY PREFILTER — if any hard gate triggers the
+# job is dropped; otherwise it proceeds to Haiku for ranking.
+#
+# Copy this file to `config/scoring.yaml` and tune to your preferences.
+# See docs/USER_CONFIG.md §2 for a section-by-section walkthrough.
+#
+# KEEP THESE STRUCTURAL KEYS (the loaders + tests depend on them):
+#   weights, keywords, industry_buckets, gates, modifiers, tiers,
+#   semantic, location, static_lists
+#
+# The values below encode preferences for the example persona (Alex
+# Rivera — senior-to-staff backend engineer in Austin, targeting SaaS
+# / developer-tools / fintech). Replace every value with your own.
+# =====================================================================
+
+# --------------------------------------------------------------------
+# weights — MUST sum to 1.0
+# How much each scoring dimension contributes to the algo score. For
+# the pipeline the weighted algo score is only used as a soft
+# tiebreaker between close Haiku scores; the primary signal is Haiku.
+# --------------------------------------------------------------------
+weights:
+  role_fit:              0.22
+  industry_alignment:    0.18
+  geographic:            0.14
+  compensation:          0.14
+  work_life_quality:     0.12
+  passion_identity:      0.06
+  cultural_alignment:    0.06
+  company_health:        0.04
+  career_trajectory:     0.04
+  engagement_type:       0.00
+
+# --------------------------------------------------------------------
+# keywords — substring matchers used across the category scorers.
+# Every list below is personal vocabulary for the target persona.
+# Extend or replace freely. All matching is case-insensitive.
+# --------------------------------------------------------------------
+keywords:
+
+  # Role-fit POSITIVE — titles / phrases that signal the right kind
+  # of role for Alex (senior-to-staff backend / platform).
+  senior_ic:
+    - "staff engineer"
+    - "staff software engineer"
+    - "senior staff engineer"
+    - "principal engineer"
+    - "principal software engineer"
+    - "senior software engineer"
+    - "senior backend engineer"
+    - "platform engineer"
+    - "infrastructure engineer"
+    - "distributed systems"
+    - "site reliability engineer"
+    - "sre"
+    - "developer experience"
+    - "dx engineer"
+    - "devex"
+
+  core_tech:
+    - "python"
+    - "golang"
+    - " go "
+    - "postgres"
+    - "postgresql"
+    - "kafka"
+    - "event-driven"
+    - "microservices"
+    - "kubernetes"
+    - "k8s"
+    - "grpc"
+    - "terraform"
+    - "observability"
+    - "grafana"
+    - "prometheus"
+
+  # Role-fit NEGATIVE — disqualify or down-score
+  mgmt_ladder:
+    - "engineering manager"
+    - "director of engineering"
+    - "head of engineering"
+    - "vp of engineering"
+    - "people manager"
+    - "manage a team"
+    - "budget ownership"
+    - "performance reviews"
+
+  frontend_heavy:
+    - "front-end engineer"
+    - "frontend engineer"
+    - "react native"
+    - "ios engineer"
+    - "android engineer"
+    - "mobile engineer"
+    - "ui engineer"
+
+  # Hard disqualifiers (any appearance in title or tight summary =
+  # drop immediately).
+  seniority_disqualifiers:
+    - "intern"
+    - "internship"
+    - "entry level"
+    - "entry-level"
+    - "new grad"
+    - "new graduate"
+    - "apprentice"
+    - "junior"
+
+  # Crunch-culture red flags (soft penalty in work_life_quality).
+  crunch_flags:
+    - "60+ hour"
+    - "whatever it takes"
+    - "hustle culture"
+    - "work hard play hard"
+    - "founding engineer"
+    - "24/7 on-call"
+    - "always-on"
+    - "move fast and break things"
+
+# --------------------------------------------------------------------
+# industry_buckets — bucket scores (0-10) for broad sector alignment.
+# Higher = more desirable for the candidate.
+# --------------------------------------------------------------------
+industry_buckets:
+  dev_tools:         10
+  developer_tools:   10
+  saas_b2b:           9
+  fintech:            9
+  cloud_infra:        9
+  data_infra:         8
+  ai_infra:           8
+  enterprise:         6
+  consumer_saas:      5
+  ecommerce:          4
+  healthcare_tech:    4
+  crypto:             0
+  web3:               0
+  adtech:             1
+  gaming:             5
+
+# --------------------------------------------------------------------
+# Quick company → industry lookup (overrides keyword matching).
+# --------------------------------------------------------------------
+company_industry_map:
+  stripe:       fintech
+  shopify:      saas_b2b
+  hashicorp:    dev_tools
+  vercel:       dev_tools
+  linear:       saas_b2b
+  notion:       saas_b2b
+  supabase:     dev_tools
+  databricks:   data_infra
+  snowflake:    data_infra
+  temporal:     dev_tools
+  planetscale:  data_infra
+  anthropic:    ai_infra
+
+# --------------------------------------------------------------------
+# gates — hard filters. If a gate triggers, final score = 0.
+# --------------------------------------------------------------------
+gates:
+  intern_filter:        true   # drop intern / new-grad / junior titles
+  crunch_required:      false  # set true to auto-reject crunch-flagged roles
+  onsite_outside_metro: true   # drop on-site roles outside location.metros
+  clearance_required:   true   # drop roles requiring a security clearance
+  relocation_required:  true   # drop roles requiring relocation
+
+# --------------------------------------------------------------------
+# modifiers — score bumps/penalties applied after category math.
+# --------------------------------------------------------------------
+modifiers:
+  tier_s_bonus:        10
+  tier_1_bonus:         6
+  tier_2_bonus:         3
+  passion_dev_tools:    4
+  passion_open_source:  3
+  passion_ai_infra:     3
+  red_flag_crunch:     -8
+  red_flag_ad_tech:    -6
+
+# --------------------------------------------------------------------
+# tiers — 0-100 score cutoffs for final tier label.
+# --------------------------------------------------------------------
+tiers:
+  T1:   78
+  T2:   65
+  T3:   50
+  T4:    0
+
+# --------------------------------------------------------------------
+# tracks — career-story buckets. The prefilter picks one track
+# per job based on company + keywords; the frontend tab strip renders
+# these as top-level navigation.
+# --------------------------------------------------------------------
+tracks:
+  TRACK_1_FULLTIME:
+    label: "Primary"
+    description: "Senior/Staff IC roles in your primary target track."
+  TRACK_2_INTERIM:
+    label: "Interim / Contract"
+    description: "Short-term or fractional engagements."
+  TRACK_3_PIVOT:
+    label: "Pivot / Explore"
+    description: "Adjacent industries the candidate is curious about."
+    industries:
+      - ai_infra
+      - data_infra
+
+# --------------------------------------------------------------------
+# static_lists — hand-maintained allow/deny lists.
+# --------------------------------------------------------------------
+static_lists:
+  crunch_companies:
+    # Companies with well-documented crunch cultures (personal call).
+    - "example-crunch-co"
+  crunch_reduced:
+    # Companies that used to have crunch reputations but reportedly
+    # reformed; apply a reduced penalty instead of the full one.
+    - "example-reformed-co"
+  nonlocal_cities:
+    # Metros you cannot / will not work from (on-site there = drop).
+    - "seattle"
+    - "bay area"
+    - "los angeles"
+    - "boston"
+
+# --------------------------------------------------------------------
+# semantic — Haiku integration knobs.
+# --------------------------------------------------------------------
+semantic:
+  enabled:              true
+  model:                "claude-haiku-4-5"
+  max_output_tokens:    800
+  temperature:          0.0
+  cache_ttl_hours:      168   # 7 days
+  rate_limit_rps:       5
+  blend_weight_semantic: 1.0  # Haiku is sole ranker
+  blend_weight_algo:     0.0
+
+# --------------------------------------------------------------------
+# location — geography preferences.
+# --------------------------------------------------------------------
+location:
+  # Labels used in UI + scoring.
+  presets:
+    remote_us:
+      label: "Remote US"
+      work_mode: "remote"
+    austin_hybrid:
+      label: "Austin hybrid"
+      metro: "austin"
+      work_mode: "hybrid"
+      max_days_per_week: 2
+  # Metros where on-site is acceptable.
+  metros:
+    - "austin"
+    - "round rock"
+    - "cedar park"
+  keywords:
+    commutable:
+      - "austin, tx"
+      - "austin metro"
+      - "austin texas"
+    remote_us:
+      - "remote - us"
+      - "remote (us)"
+      - "remote usa"
+      - "remote-friendly"
+      - "us remote"

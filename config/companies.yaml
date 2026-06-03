@@ -1,0 +1,135 @@
+# =====================================================================
+# EXAMPLE companies.yaml — replace every entry below with your own
+# target companies before deploying.
+#
+# Every company in this file is a target. Tier assignments (S / 1 / 2)
+# encode preference: S = dream, 1 = primary, 2 = secondary. Each entry
+# also encodes which ATS (applicant tracking system) the company uses
+# and the company's slug inside that ATS. The scrapers at
+# src/scrapers/{greenhouse,lever,ashby,smartrecruiters,workday}.py pull
+# jobs from each listed company.
+#
+# How to use:
+#   1. Copy this file to `config/companies.yaml`.
+#   2. Delete every example entry below.
+#   3. For each company you want to target, add a block with:
+#        - name             — display name (e.g. "Stripe")
+#        - name_normalized  — lowercase, suffix-stripped; must match
+#                             whatever appears in scraped data
+#        - tier             — "S" | "1" | "2"
+#        - ats              — one of greenhouse / lever / ashby /
+#                             smartrecruiters / workday / null
+#        - ats_slug         — the company's ID inside that ATS
+#   4. `sam build && sam deploy` to ship the new list to Lambda.
+#   5. `python scripts/seed_companies.py` to populate DynamoDB.
+#
+# How to find ATS slugs — open the company's careers page in a
+# browser. The URL path reveals it:
+#   boards.greenhouse.io/{slug}      — Greenhouse
+#   jobs.lever.co/{slug}             — Lever
+#   jobs.ashbyhq.com/{slug}          — Ashby
+#   jobs.smartrecruiters.com/{id}    — SmartRecruiters
+# Workday is more involved; see the config/companies.yaml in the original author's
+# original README for a probe recipe. Set `ats: null` for companies on
+# ATSes the scraper base doesn't support.
+#
+# TIER MODIFIERS (configured in scoring.yaml):
+#   S  Dream company  — +10 score modifier
+#   1  Primary target — +6
+#   2  Secondary      — +3
+#
+# The example companies below are illustrative ONLY. They reflect the
+# kind of companies the sample persona (Alex Rivera, Austin-based
+# senior-to-staff backend engineer) might target. Replace entirely.
+# =====================================================================
+
+companies:
+
+  # ======================================================================
+  # Tier S — Dream companies
+  # ======================================================================
+
+  - name: "Stripe"
+    name_normalized: "stripe"
+    tier: "S"
+    ats: greenhouse
+    ats_slug: "stripe"
+
+  - name: "HashiCorp"
+    name_normalized: "hashicorp"
+    tier: "S"
+    ats: greenhouse
+    ats_slug: "hashicorp"
+
+  - name: "Anthropic"
+    name_normalized: "anthropic"
+    tier: "S"
+    ats: greenhouse
+    ats_slug: "anthropic"
+
+  # ======================================================================
+  # Tier 1 — Primary targets
+  # ======================================================================
+
+  - name: "Shopify"
+    name_normalized: "shopify"
+    tier: "1"
+    ats: greenhouse
+    ats_slug: "shopify"
+
+  - name: "Notion"
+    name_normalized: "notion"
+    tier: "1"
+    ats: greenhouse
+    ats_slug: "notion"
+
+  - name: "Linear"
+    name_normalized: "linear"
+    tier: "1"
+    ats: ashby
+    ats_slug: "linear"
+
+  - name: "Vercel"
+    name_normalized: "vercel"
+    tier: "1"
+    ats: greenhouse
+    ats_slug: "vercel"
+
+  - name: "Supabase"
+    name_normalized: "supabase"
+    tier: "1"
+    ats: ashby
+    ats_slug: "supabase"
+
+  # ======================================================================
+  # Tier 2 — Secondary targets
+  # ======================================================================
+
+  - name: "Databricks"
+    name_normalized: "databricks"
+    tier: "2"
+    ats: greenhouse
+    ats_slug: "databricks"
+
+  - name: "Snowflake"
+    name_normalized: "snowflake"
+    tier: "2"
+    ats: workday
+    ats_slug: "snowflake"
+    workday:
+      base_url: "https://snowflake.wd1.myworkdayjobs.com"
+      tenant:   "snowflake"
+      site:     "Snowflake_Careers"
+      max_jobs: 250
+
+  - name: "Temporal"
+    name_normalized: "temporal"
+    tier: "2"
+    ats: lever
+    ats_slug: "temporal"
+
+  - name: "PlanetScale"
+    name_normalized: "planetscale"
+    tier: "2"
+    ats: ashby
+    ats_slug: "planetscale"

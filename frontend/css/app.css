@@ -1,0 +1,1538 @@
+/* =====================================================================
+   Jobs Aggregator — single-file CSS, no build step.
+   "Atrium" aesthetic:
+     editorial research-tool language — Fraunces display + Inter UI +
+     JetBrains Mono for data. Dark "ink after-hours" (default) +
+     light "paper daylight" (OS preference auto-switch). Color reserved
+     for tier signal; everything else is warm neutral.
+
+   Tokens and base primitives are adapted from the Atrium design-system
+   file shipped by the designer. Class names below match what the
+   existing JS (`app.js`, `job.js`, `settings.js`, `health.js`,
+   `common.js`) already emits, so the CSS drops in without touching
+   any JS.
+   ===================================================================== */
+
+/* =====================================================================
+   1. Tokens — dark first, light via prefers-color-scheme
+   ===================================================================== */
+:root {
+  /* Type */
+  --font-display: "Fraunces", "Iowan Old Style", "Charter", Georgia, serif;
+  --font-ui:      "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                  "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Type scale */
+  --t-11: 11px; --t-12: 12px; --t-13: 13px; --t-14: 14px; --t-15: 15px;
+  --t-16: 16px; --t-18: 18px; --t-22: 22px; --t-28: 28px;
+  --t-36: 36px; --t-48: 48px;
+
+  /* Shape */
+  --radius-xs:   6px;
+  --radius-sm:   10px;
+  --radius:      14px;
+  --radius-lg:   20px;
+  --radius-pill: 999px;
+
+  /* Spacing */
+  --s-2: 2px; --s-4: 4px; --s-6: 6px; --s-8: 8px; --s-10: 10px;
+  --s-12: 12px; --s-14: 14px; --s-16: 16px; --s-20: 20px;
+  --s-24: 24px; --s-32: 32px; --s-40: 40px; --s-56: 56px;
+
+  /* Legacy padding aliases (kept for any inline style still in flight) */
+  --pad:       1rem;
+  --pad-tight: 0.65rem;
+
+  /* Motion */
+  --ease-out:    cubic-bezier(.2,.7,.3,1);
+  --ease-in-out: cubic-bezier(.6,.1,.3,1);
+  --dur-1: 120ms; --dur-2: 200ms; --dur-3: 320ms;
+
+  /* iOS safe-area insets */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+
+  /* Layout primitives used by the browse scaffold */
+  --nav-h:    64px;
+  --topbar-h: 148px;
+
+  /* -------- Dark (default) — "Ink after-hours" -------- */
+  --bg:            #0e1014;
+  --bg-soft:       #14171d;
+  --surface:       #181b22;
+  --surface-2:     #1f232c;
+  --surface-3:     #262b36;
+  --border:        rgba(230, 225, 215, 0.08);
+  --border-strong: rgba(230, 225, 215, 0.16);
+
+  --fg:            #ece7da;   /* warm ivory */
+  --fg-soft:       #c4bfb2;
+  --muted:         #8a8578;
+  --dim:           #5e5b54;
+
+  --accent:        #d9a86c;   /* brass */
+  --accent-2:      #b9874a;
+  --accent-soft:   rgba(217, 168, 108, 0.14);
+  --accent-fg:     #1a1612;
+
+  --danger:        #e07868;
+  --warn:          #e4a94b;
+  --ok:            #7aaf84;
+
+  /* Tier palette (6 desaturated hues — meaning, not decoration) */
+  --tier-s:      #b99ce6;  --tier-s-fg:   #1a1324;
+  --tier-1:      #7aaf84;  --tier-1-fg:   #0f1a12;
+  --tier-2:      #d9a86c;  --tier-2-fg:   #1a1206;
+  --tier-3:      #d88b5c;  --tier-3-fg:   #1a0e05;
+  --tier-low:    #7a7468;  --tier-low-fg: #15130f;
+  --tier-red:    #c86464;  --tier-red-fg: #180808;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.35);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.40);
+  --shadow-lg: 0 16px 40px rgba(0,0,0,0.55);
+
+  --ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+/* -------- Light — "Paper daylight" (auto-switch via OS) -------- */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:            #f4f0e7;   /* warm paper */
+    --bg-soft:       #ece7d9;
+    --surface:       #fbf8f1;
+    --surface-2:     #f4efe2;
+    --surface-3:     #ebe4d1;
+    --border:        rgba(40, 32, 20, 0.10);
+    --border-strong: rgba(40, 32, 20, 0.22);
+
+    --fg:            #1c1812;
+    --fg-soft:       #3e3830;
+    --muted:         #78716a;
+    --dim:           #a5a097;
+
+    --accent:        #8a5a1f;   /* dark brass */
+    --accent-2:      #6a4210;
+    --accent-soft:   rgba(138, 90, 31, 0.10);
+    --accent-fg:     #fbf8f1;
+
+    --danger:        #b54a38;
+    --warn:          #9b6a1c;
+    --ok:            #3f7a4d;
+
+    --tier-s:      #7a4fc2;  --tier-s-fg:   #fbf8f1;
+    --tier-1:      #3f7a4d;  --tier-1-fg:   #fbf8f1;
+    --tier-2:      #a97327;  --tier-2-fg:   #fbf8f1;
+    --tier-3:      #b45a1f;  --tier-3-fg:   #fbf8f1;
+    --tier-low:    #78716a;  --tier-low-fg: #fbf8f1;
+    --tier-red:    #a63f2e;  --tier-red-fg: #fbf8f1;
+
+    --shadow-sm: 0 1px 2px rgba(60, 40, 20, 0.06);
+    --shadow-md: 0 4px 12px rgba(60, 40, 20, 0.08);
+    --shadow-lg: 0 16px 32px rgba(60, 40, 20, 0.12);
+  }
+}
+
+/* =====================================================================
+   2. Reset + base typography
+   ===================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv11";
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-left:  var(--safe-left);
+  padding-right: var(--safe-right);
+  position: relative;
+}
+
+/* Paper grain overlay (light mode only). Attached to body::before so
+   it sits behind content but above the bg. SVG is inline so no request. */
+@media (prefers-color-scheme: light) {
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.45;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 0 0.1  0 0 0 0.04 0'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
+  }
+  body > * { position: relative; z-index: 1; }
+}
+
+/* Non-browse pages reserve space for the bottom nav. */
+body:not(.browse-page) {
+  padding-top:    var(--safe-top);
+  padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 20px);
+}
+
+/* Typography */
+h1, h2, h3, h4, .display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin: 0;
+  color: var(--fg);
+}
+h1 { font-size: var(--t-28); line-height: 1.15; }
+h2 { font-size: var(--t-22); line-height: 1.2; }
+h3 { font-size: var(--t-18); line-height: 1.25; }
+
+.mono { font-family: var(--font-mono); font-feature-settings: "tnum"; }
+.num  { font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em; }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.subtitle, .hint, .muted {
+  color: var(--muted);
+  font-size: var(--t-13);
+  margin: 0.15rem 0 0;
+}
+.hint { font-size: var(--t-13); }
+.muted-meta { color: var(--muted); font-size: var(--t-13); }
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--radius-xs);
+}
+
+/* =====================================================================
+   3. Buttons (legacy + modern selectors)
+   ===================================================================== */
+.btn, button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-size: var(--t-14);
+  font-weight: 500;
+  min-height: 40px;
+  padding: 0 16px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  line-height: 1;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-1), border-color var(--dur-1),
+              color var(--dur-1), transform var(--dur-1);
+}
+.btn:active, button:active { transform: translateY(1px); }
+
+.btn--primary, button.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.btn--primary:hover, button.primary:hover {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+}
+.btn--ghost {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--fg);
+}
+.btn--ghost:hover { background: var(--surface-2); }
+.btn--text {
+  background: transparent;
+  border: none;
+  padding: 0 8px;
+  color: var(--accent);
+}
+.btn--text:hover { background: var(--accent-soft); }
+.btn--danger, button.danger {
+  background: transparent;
+  border-color: color-mix(in oklab, var(--danger) 50%, transparent);
+  color: var(--danger);
+}
+.btn--danger:hover, button.danger:hover {
+  background: color-mix(in oklab, var(--danger) 12%, transparent);
+}
+.btn--lg { min-height: 48px; padding: 0 20px; font-size: var(--t-15); }
+.btn--sm { min-height: 32px; padding: 0 10px; font-size: var(--t-13); }
+
+/* "Applied" status button on the job detail page — success-tinted.
+   Used by the .applied legacy class that job.js renders. */
+button.applied {
+  background: color-mix(in oklab, var(--ok) 16%, transparent);
+  border-color: color-mix(in oklab, var(--ok) 40%, transparent);
+  color: var(--ok);
+}
+button.applied:hover {
+  background: color-mix(in oklab, var(--ok) 22%, transparent);
+}
+
+.btn:disabled, button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Small rounded count badge used next to "Filters" */
+.badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  margin-left: 4px;
+  line-height: 1.4;
+}
+
+/* =====================================================================
+   4. Inputs
+   ===================================================================== */
+input[type="text"], input[type="number"], input[type="search"], select {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+  height: 40px;
+  line-height: 1.4;
+}
+input[type="search"] { -webkit-appearance: none; }
+input::placeholder { color: var(--muted); }
+
+/* Wrapping "search" element — icon + input */
+.search {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 12px 0 36px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+.search input {
+  all: unset;
+  width: 100%;
+  font-size: 16px;
+  color: var(--fg);
+  font-family: var(--font-ui);
+}
+.search__icon {
+  position: absolute;
+  left: 12px; top: 50%;
+  transform: translateY(-50%);
+  width: 18px; height: 18px;
+  color: var(--muted);
+  font-size: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* Sort dropdown: keep it compact; browsers own the open menu */
+.sort-select {
+  font-family: var(--font-ui);
+  font-size: var(--t-14);
+  min-height: 40px;
+  padding: 0 28px 0 12px;
+  background: var(--surface) no-repeat right 10px center;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+                    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-size: 5px 5px, 5px 5px;
+  background-position: calc(100% - 15px) 18px, calc(100% - 10px) 18px;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* =====================================================================
+   5. Score badge — maps legacy `.s-*` classes to the new tier tokens
+   ===================================================================== */
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px; height: 44px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: -0.03em;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  flex-shrink: 0;
+  color: #fff;
+  background: var(--surface-3);
+  border: 1px solid transparent;
+  transition: transform var(--dur-1), box-shadow var(--dur-1);
+}
+.score-badge:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+
+/* Larger variant used on the job detail page header */
+#job-score.score-badge,
+.score-badge--lg {
+  width: 72px; height: 72px;
+  font-size: 24px;
+}
+
+.score-badge.s-purple { background: var(--tier-s);   color: var(--tier-s-fg); }
+.score-badge.s-green  { background: var(--tier-1);   color: var(--tier-1-fg); }
+.score-badge.s-yellow { background: var(--tier-2);   color: var(--tier-2-fg); }
+.score-badge.s-orange { background: var(--tier-3);   color: var(--tier-3-fg); }
+.score-badge.s-gray   { background: var(--tier-low); color: var(--tier-low-fg); }
+.score-badge.s-red    { background: var(--tier-red); color: var(--tier-red-fg); }
+
+/* =====================================================================
+   6. QoL bar — .qol-bar__lbl/__track/__fill/__val
+   ===================================================================== */
+.qol-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+}
+.qol-bar__lbl {
+  font-family: var(--font-mono);
+  font-size: var(--t-11);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-weight: 500;
+}
+.qol-bar__track {
+  position: relative;
+  height: 4px;
+  background: var(--surface-3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.qol-bar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--qol, 0%);
+  background: linear-gradient(90deg, var(--tier-low), var(--tier-2) 50%, var(--tier-1));
+  border-radius: 2px;
+  transition: width var(--dur-2) var(--ease-out);
+}
+.qol-bar__val {
+  font-family: var(--font-mono);
+  font-size: var(--t-13);
+  color: var(--fg-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* =====================================================================
+   7. Tags (industry / group / role)
+   ===================================================================== */
+.tag, .job-card__tags .tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-size: var(--t-12);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.tag.tag--industry {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 30%, transparent);
+}
+.tag.tag--group {
+  background: color-mix(in oklab, var(--tier-s) 16%, transparent);
+  color: var(--tier-s);
+  border-color: color-mix(in oklab, var(--tier-s) 30%, transparent);
+}
+.tag.tag--role {
+  background: transparent;
+  color: var(--fg-soft);
+  border-color: var(--border-strong);
+}
+
+/* =====================================================================
+   8. Work-mode + engagement chips (on cards + detail page)
+   ===================================================================== */
+.work-mode-chip, .engagement-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: var(--t-12);
+  color: var(--fg-soft);
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.work-mode-chip.wm-remote {
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 35%, transparent);
+  background: color-mix(in oklab, var(--ok) 10%, transparent);
+}
+.work-mode-chip.wm-hybrid {
+  color: var(--warn);
+  border-color: color-mix(in oklab, var(--warn) 35%, transparent);
+  background: color-mix(in oklab, var(--warn) 10%, transparent);
+}
+.work-mode-chip.wm-onsite {
+  color: var(--fg-soft);
+}
+.engagement-chip {
+  color: var(--warn);
+  font-weight: 500;
+  border-color: color-mix(in oklab, var(--warn) 35%, transparent);
+  background: color-mix(in oklab, var(--warn) 8%, transparent);
+}
+
+/* =====================================================================
+   9. Metric pill (salary)
+   ===================================================================== */
+.metric-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--t-13);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  padding: 0 2px;
+}
+.metric-pill__lbl {
+  font-size: var(--t-11);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Card sub-line separator dot */
+.sep { color: var(--dim); margin: 0 4px; }
+.dupe-hint { color: var(--dim); font-family: var(--font-mono); font-size: 11px; }
+
+/* =====================================================================
+   10. Semantic rationale snippet (italic editorial pull-quote)
+   ===================================================================== */
+.semantic-snippet {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--t-14);
+  line-height: 1.45;
+  color: var(--fg-soft);
+  border-left: 2px solid var(--border-strong);
+  padding-left: 10px;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* =====================================================================
+   11. Job card (the main content unit)
+   ===================================================================== */
+.job-card {
+  position: relative;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  transition: border-color var(--dur-1), background var(--dur-1),
+              transform var(--dur-1);
+}
+.job-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.job-card:active { transform: translateY(1px); }
+
+.job-card.is-selected,
+body.select-mode .job-card.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Select-mode checkbox — absolute top-left */
+.job-card__check {
+  position: absolute;
+  top: 14px; left: 14px;
+  width: 22px; height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.job-card__check input {
+  width: 22px; height: 22px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0;
+}
+body.select-mode .job-card__row1 { padding-left: 34px; }
+
+/* Row 1: title on the left, metric cluster on the right */
+.job-card__row1 {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 16px;
+}
+.job-card__title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: var(--fg);
+  text-decoration: none;
+  display: block;
+  word-break: break-word;
+}
+.job-card__title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.job-card__metrics {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* Row 2: meta */
+.job-card__sub {
+  font-size: var(--t-13);
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 4px;
+  line-height: 1.5;
+}
+.job-card__sub .company-link,
+.job-card__sub a.company {
+  color: var(--fg);
+  font-weight: 500;
+}
+.job-card__sub a { color: var(--fg); }
+.job-card__sub a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.job-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* =====================================================================
+   12. Topbar (browse-page only)
+   ===================================================================== */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg);
+  padding: 16px 20px 0;
+  padding-top: calc(16px + var(--safe-top));
+  border-bottom: 1px solid var(--border);
+}
+.topbar__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.topbar__title h1 {
+  font-size: var(--t-28);
+  letter-spacing: -0.02em;
+}
+#topbar-subtitle {
+  font-size: var(--t-13);
+  color: var(--muted);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.topbar__controls {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.topbar__controls .sort-select { display: none; }  /* tucked into filter rail on mobile */
+
+/* Status tabs — underline-style */
+.status-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 4px -20px 0;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+.status-tabs::-webkit-scrollbar { display: none; }
+.status-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  min-height: 44px;
+  font-family: var(--font-ui);
+  font-size: var(--t-14);
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: 0;
+  min-width: unset;
+}
+.status-tabs button:hover { color: var(--fg-soft); }
+.status-tabs button.on {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+
+/* Active filter chips (the dismissible row) */
+.active-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 0 12px;
+}
+.active-chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--t-13);
+  font-weight: 500;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent);
+  line-height: 1;
+  white-space: nowrap;
+}
+.active-chips .chip button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.65;
+  padding: 0 0 0 4px;
+  font-size: 14px;
+  min-height: auto;
+  min-width: auto;
+  cursor: pointer;
+}
+.active-chips .chip button:hover { opacity: 1; }
+
+/* =====================================================================
+   13. Browse shell layout (mobile col / desktop 2-col)
+   ===================================================================== */
+.browse-shell {
+  display: block;
+  padding: 14px 20px 80px;
+}
+
+@media (min-width: 1024px) {
+  .topbar__controls { grid-template-columns: 1fr auto auto auto; }
+  .topbar__controls .sort-select { display: inline-flex; }
+  .browse-shell {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 28px;
+    padding: 20px 28px 40px;
+  }
+  /* Filters-trigger hidden on desktop — the rail is permanent */
+  .filters-trigger:not(.close) { display: none; }
+}
+
+/* =====================================================================
+   14. Filter rail / drawer
+   ===================================================================== */
+.filter-rail {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: min(360px, 92vw);
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  padding: 20px;
+  padding-top: calc(20px + var(--safe-top));
+  padding-bottom: calc(20px + var(--safe-bottom));
+  overflow-y: auto;
+  z-index: 40;
+  transform: translateX(-100%);
+  transition: transform var(--dur-2) var(--ease-out);
+  box-shadow: var(--shadow-lg);
+}
+body.rail-open .filter-rail { transform: translateX(0); }
+
+.filter-rail__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.filter-rail__header h2 {
+  font-size: var(--t-22);
+  flex: 1;
+}
+.filter-rail__body { padding-bottom: 100px; }
+
+.filter-rail__footer {
+  position: sticky;
+  bottom: 0;
+  margin: 0 -20px -20px;
+  padding: 12px 20px calc(12px + var(--safe-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+#rail-count { font-variant-numeric: tabular-nums; }
+
+.filter-section { margin-bottom: 22px; }
+.filter-section h3 {
+  font-family: var(--font-mono);
+  font-size: var(--t-11);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+/* Chip list inside a filter section */
+.chip-list {
+  list-style: none;
+  margin: 0; padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: var(--radius-pill);
+  font-size: var(--t-13);
+  font-weight: 500;
+  line-height: 1;
+  color: var(--fg-soft);
+  background: transparent;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  min-height: 32px;
+  user-select: none;
+}
+.chip-list li:hover { background: var(--surface-2); color: var(--fg); border-color: var(--border-strong); }
+.chip-list li.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+/* Slider row + output */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.slider-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 28px;
+}
+.slider-out {
+  font-family: var(--font-mono);
+  font-size: var(--t-13);
+  color: var(--accent);
+  min-width: 52px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mobile backdrop when drawer is open */
+.rail-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  z-index: 30;
+  opacity: 0;
+  transition: opacity var(--dur-2);
+}
+body.rail-open .rail-backdrop {
+  opacity: 1;
+}
+
+/* Desktop: the rail is permanent in the left column.
+   ---
+   the base `.filter-rail` style (the mobile
+   drawer) hard-codes width: min(360px, 92vw) + position: fixed +
+   top/left/bottom: 0, because it needs to slide in from off-canvas.
+   On desktop we flip to `position: sticky` in a 300px grid column, but
+   we also have to *reset* width / left / bottom, otherwise the 360px
+   width bleeds through and the rail overflows its column by 60px,
+   covering the left edge of every job card and the bulk-toolbar text
+   (the "tMGM" / "oogle" / "olby" clipping bug the original author reported). */
+@media (min-width: 1024px) {
+  .filter-rail {
+    position: sticky;
+    top: calc(var(--topbar-h) + 12px);
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: auto;           /* honour the 300px grid column */
+    max-width: none;
+    align-self: start;
+    height: calc(100vh - var(--topbar-h) - 30px);
+    transform: none !important;
+    box-shadow: none;
+    border-right: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    background: var(--bg-soft);
+  }
+  .filter-rail__header .filters-trigger.close { display: none; }
+  .filter-rail__footer { background: var(--bg-soft); }
+  .rail-backdrop { display: none !important; }
+}
+
+/* =====================================================================
+   15. Results column
+   ===================================================================== */
+.results { min-width: 0; }
+
+.results__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 14px;
+  font-size: var(--t-13);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bulk toolbar */
+.bulk-toolbar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bulk-toolbar__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.bulk-toolbar__count {
+  font-family: var(--font-display);
+  font-size: var(--t-18);
+  color: var(--fg);
+}
+.bulk-toolbar__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.bulk-toolbar__hint {
+  font-size: var(--t-13);
+  color: var(--muted);
+  margin: 0;
+}
+
+/* Job cards list */
+.job-cards {
+  list-style: none;
+  margin: 0; padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.empty-state {
+  text-align: center;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--t-16);
+  color: var(--muted);
+  padding: 40px 20px;
+}
+
+.load-more {
+  display: block;
+  margin: 20px auto 0;
+  min-width: 180px;
+}
+
+/* =====================================================================
+   16. Non-browse page scaffold (job / settings / health)
+   ===================================================================== */
+body:not(.browse-page) header {
+  padding: 20px 20px 8px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+body:not(.browse-page) main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 4px;
+}
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin: 14px 16px;
+}
+.card h2, .card h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  margin: 0 0 12px;
+}
+.card h2 { font-size: var(--t-22); }
+.card h3 { font-size: var(--t-18); }
+
+/* Row-flex utility used by settings inputs */
+.row-flex {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.row-flex input[type="text"],
+.row-flex input[type="number"] {
+  flex: 1;
+  min-width: 8rem;
+}
+
+/* Job detail — fact-sheet dl */
+.detail-meta {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px 16px;
+  font-size: var(--t-14);
+  margin: 0 0 16px;
+}
+.detail-meta dt {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--t-11);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding-top: 3px;
+}
+.detail-meta dd { margin: 0; color: var(--fg); }
+
+/* Row-flex variant on the job detail header (title + score) */
+header .row-flex {
+  align-items: flex-start;
+  margin-bottom: 0;
+}
+
+/* Action row (Save / Skip / Applied) on job detail */
+.action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0;
+}
+.action-row button { width: 100%; }
+.action-row .action-save { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+.action-row .action-save:hover { background: var(--accent-2); }
+
+/* Description body (raw scraped HTML) */
+.description {
+  font-size: var(--t-15);
+  line-height: 1.7;
+  color: var(--fg-soft);
+}
+.description p { margin: 0 0 12px; }
+.description ul, .description ol { margin: 0 0 12px 20px; padding: 0; }
+.description strong { color: var(--fg); }
+
+/* Score breakdown rows (inline on job.html + inside modal) */
+#score-breakdown h3 {
+  font-size: var(--t-18);
+  margin-bottom: 14px;
+}
+.breakdown-row {
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  font-size: var(--t-13);
+}
+.breakdown-row + .breakdown-row { border-top: 1px solid var(--border); }
+.breakdown-row .bar {
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.breakdown-row .bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width var(--dur-3) var(--ease-out);
+}
+.breakdown-row .num {
+  color: var(--fg-soft);
+  font-family: var(--font-mono);
+  font-size: var(--t-12);
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  text-align: right;
+}
+
+/* Modifier pills at the bottom of a breakdown */
+.mods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.mod {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--t-12);
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  color: var(--fg-soft);
+}
+.mod.plus  { color: var(--ok);      border-color: color-mix(in oklab, var(--ok) 40%, transparent); }
+.mod.minus { color: var(--danger);  border-color: color-mix(in oklab, var(--danger) 40%, transparent); }
+
+/* =====================================================================
+   17. Settings page tag-list + health page grid
+   ===================================================================== */
+.tag-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--t-13);
+  color: var(--fg-soft);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.tag-list li button {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 0 0 0 2px;
+  min-height: auto;
+  min-width: auto;
+  font-size: 14px;
+  opacity: 0.65;
+  cursor: pointer;
+}
+.tag-list li button:hover { opacity: 1; color: var(--danger); }
+
+.health-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+@media (min-width: 720px) {
+  .health-grid { grid-template-columns: 1fr 1fr; }
+}
+.health-grid .run-tile {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+.health-grid .run-tile .status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.health-grid .run-tile.failed .status-dot { background: var(--danger); }
+.health-grid .run-tile .src-name {
+  font-family: var(--font-mono);
+  font-size: var(--t-13);
+  color: var(--fg);
+}
+.health-grid .run-tile .meta {
+  font-size: var(--t-12);
+  color: var(--muted);
+  margin-top: 2px;
+}
+.health-grid .run-tile.failed .meta { color: var(--danger); }
+.health-grid .run-tile .when {
+  font-family: var(--font-mono);
+  font-size: var(--t-12);
+  color: var(--muted);
+  text-align: right;
+}
+
+/* =====================================================================
+   18. Modal (score breakdown popover)
+   ===================================================================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-2);
+}
+.modal-backdrop.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (min-width: 720px) {
+  .modal-backdrop { align-items: center; }
+}
+.modal {
+  background: var(--bg);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: 12px 20px 24px;
+  padding-bottom: calc(24px + var(--safe-bottom));
+  max-height: 90vh;
+  width: 100%;
+  max-width: 560px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(24px);
+  transition: transform var(--dur-2) var(--ease-out);
+}
+.modal-backdrop.show .modal { transform: translateY(0); }
+@media (min-width: 720px) {
+  .modal { border-radius: var(--radius-lg); }
+}
+/* Drag-handle bar on mobile sheet */
+.modal::before {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 4px;
+  background: var(--border-strong);
+  border-radius: 2px;
+  margin: 0 auto 12px;
+}
+@media (min-width: 720px) {
+  .modal::before { display: none; }
+}
+.modal header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 0;
+}
+.modal header h3 {
+  margin: 0;
+  flex: 1;
+  font-size: var(--t-18);
+  font-family: var(--font-display);
+  font-weight: 500;
+}
+.modal header .eyebrow,
+.modal .eyebrow {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--t-11);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.modal header button.close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 22px;
+  min-height: auto;
+  padding: 0 4px;
+  cursor: pointer;
+}
+.modal .body {
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* =====================================================================
+   19. Bottom nav (all non-browse pages)
+   ===================================================================== */
+nav.bottom-nav {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: calc(var(--nav-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  z-index: 50;
+}
+nav.bottom-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+  min-height: 44px;
+}
+nav.bottom-nav a:hover { color: var(--fg-soft); text-decoration: none; }
+nav.bottom-nav a.active { color: var(--accent); }
+body.browse-page nav.bottom-nav { display: none; }
+
+/* =====================================================================
+   20. Toast (transient feedback)
+   ===================================================================== */
+.toast {
+  position: fixed;
+  bottom: calc(24px + var(--nav-h) + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--surface-3);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  font-size: var(--t-14);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-2), transform var(--dur-2);
+  z-index: 200;
+  max-width: calc(100vw - 32px);
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.toast.error {
+  border-color: color-mix(in oklab, var(--danger) 50%, transparent);
+  color: var(--danger);
+}
+
+/* =====================================================================
+   21. Supporting rules used by JS that emits legacy class names
+   ---------------------------------------------------------------------
+   These are the smaller helpers that common.js / job.js / health.js
+   still emit. Keeping them mapped to the Atrium token palette so the
+   look stays consistent without touching the JS.
+   ===================================================================== */
+
+/* Inline loading spinner (common.js, app.js) — a 12px ring that rotates. */
+.spinner {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Condensed job list rows — rendered by common.renderJobRow on any
+   page that wants a compact link list instead of the full job card
+   (currently unused in the browse page, but still reachable). */
+.job-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  margin: 0 0 10px;
+  align-items: start;
+}
+.job-row .job-title {
+  font-family: var(--font-display);
+  font-size: var(--t-16);
+  font-weight: 500;
+  color: var(--fg);
+  text-decoration: none;
+  display: block;
+}
+.job-row .job-title:hover { color: var(--accent); }
+.job-row .job-meta {
+  font-size: var(--t-13);
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.job-row .job-meta .company-link { color: var(--fg-soft); text-decoration: none; }
+.job-row .job-meta .company-link:hover { color: var(--accent); }
+.job-row .job-posted { margin-left: 6px; color: var(--dim); }
+
+/* Score breakdown: rendered inline on job.html and inside the modal
+   body on the browse page. A two-column grid of label + value. */
+.score-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.score-breakdown .bd-row,
+.bd-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--t-13);
+  align-items: baseline;
+}
+.bd-row:last-child { border-bottom: none; }
+.bd-row strong {
+  font-family: var(--font-mono);
+  font-size: var(--t-12);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-soft);
+  font-weight: 500;
+}
+.bd-row em { font-style: italic; color: var(--fg-soft); }
+
+/* Health-page scrape-run rows (health.js emits .run-row not .run-tile).
+   Mirrors the look of .run-tile so either class works. */
+.run-row {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ok);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin: 0 0 10px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto auto;
+  gap: 4px 12px;
+}
+.run-row .source {
+  font-family: var(--font-mono);
+  font-size: var(--t-13);
+  color: var(--fg);
+  grid-row: 1;
+  grid-column: 1;
+}
+.run-row .status {
+  grid-row: 1;
+  grid-column: 2;
+  font-family: var(--font-mono);
+  font-size: var(--t-11);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--fg-soft);
+}
+.run-row .status.ok      { color: var(--ok);     border-color: color-mix(in oklab, var(--ok) 40%, transparent); }
+.run-row .status.partial { color: var(--warn);   border-color: color-mix(in oklab, var(--warn) 40%, transparent); }
+.run-row .status.error,
+.run-row .status.failed  { color: var(--danger); border-color: color-mix(in oklab, var(--danger) 40%, transparent); }
+.run-row.failed,
+.run-row:has(.status.error),
+.run-row:has(.status.failed) { border-left-color: var(--danger); }
+.run-row.partial,
+.run-row:has(.status.partial) { border-left-color: var(--warn); }
+.run-row .ts {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+  font-size: var(--t-12);
+  color: var(--muted);
+}
+.run-row .muted {
+  grid-column: 1 / -1;
+  font-size: var(--t-12);
+}
+
+/* =====================================================================
+   22. Legacy helper classes
+   ===================================================================== */
+code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--surface-2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--fg-soft);
+}
+.muted { color: var(--muted); }

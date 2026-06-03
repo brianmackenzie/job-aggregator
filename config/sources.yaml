@@ -1,0 +1,144 @@
+# =====================================================================
+# EXAMPLE sources.yaml — scraper plumbing + search content.
+#
+# This file is [MIXED]:
+#   - Scraper PLUMBING (enable flags, poll timings, actor IDs) is
+#     shared infrastructure — safe to leave as-is.
+#   - Search CONTENT (contact email, LinkedIn search URLs) is personal
+#     and MUST be customized before deploy.
+#
+# Copy this file to `config/sources.yaml`, replace the search content
+# marked [USER], then `sam build && sam deploy`.
+# =====================================================================
+
+# ----------------------------------------------------------------------
+# scraper_defaults — [USER] HTTP etiquette knobs
+# ----------------------------------------------------------------------
+# contact_email:
+#   Embedded into the User-Agent string every scraper sends. Target
+#   sites (LinkedIn, Workday tenants, some ATSes) will 403 or 429
+#   anonymous user-agents; a real reachable email both stays polite
+#   and acts as a practical unblocker.
+#
+#   REPLACE THE PLACEHOLDER before deploying. The structural test in
+#   src/scoring/tests/test_deployed_config.py will fail if this is
+#   missing or obviously invalid.
+# ----------------------------------------------------------------------
+scraper_defaults:
+  contact_email: "your-reachable-email@example.com"
+  user_agent_template: "jobs-aggregator/1.0 (personal use; {email})"
+
+sources:
+
+  # --------------------------------------------------------------------
+  # remoteok — . Clean JSON API, no auth.
+  # --------------------------------------------------------------------
+  remoteok:
+    enabled: true
+    schedule: "cron(0 6 * * ? *)"   # daily at 06:00 UTC
+    endpoint: "https://remoteok.com/api"
+    max_jobs_per_run: 500
+
+  # --------------------------------------------------------------------
+  # himalayas — . Remote-only job board, JSON.
+  # --------------------------------------------------------------------
+  himalayas:
+    enabled: true
+    schedule: "cron(0 6 * * ? *)"
+    endpoint: "https://himalayas.app/jobs/api"
+    max_jobs_per_run: 500
+
+  # --------------------------------------------------------------------
+  # hnhiring — . Hacker News "Who Is Hiring" monthly thread.
+  # --------------------------------------------------------------------
+  hnhiring:
+    enabled: true
+    schedule: "cron(0 7 1 * ? *)"   # monthly on the 1st at 07:00 UTC
+    algolia_endpoint: "https://hn.algolia.com/api/v1/search_by_date"
+    max_jobs_per_run: 300
+
+  # --------------------------------------------------------------------
+  # weworkremotely — RSS feed of all remote categories.
+  # --------------------------------------------------------------------
+  weworkremotely:
+    enabled: true
+    schedule: "cron(30 6 * * ? *)"
+    feed_url: "https://weworkremotely.com/remote-jobs.rss"
+    max_jobs_per_run: 500
+
+  # --------------------------------------------------------------------
+  # working_nomads — aggregator RSS feed.
+  # --------------------------------------------------------------------
+  working_nomads:
+    enabled: true
+    schedule: "cron(30 6 * * ? *)"
+    feed_url: "https://www.workingnomads.com/jobsfeed.xml"
+    max_jobs_per_run: 300
+
+  # --------------------------------------------------------------------
+  # greenhouse / lever / ashby / smartrecruiters / workday
+  # ATS scrapers — iterate over companies.yaml entries with matching
+  # `ats:` value. Plumbing is shared; the per-company slugs live in
+  # companies.yaml.
+  # --------------------------------------------------------------------
+  greenhouse:
+    enabled: true
+    schedule: "cron(0 8 ? * MON *)"   # weekly Monday 08:00 UTC
+    max_jobs_per_company: 250
+
+  lever:
+    enabled: true
+    schedule: "cron(0 8 ? * MON *)"
+    max_jobs_per_company: 250
+
+  ashby:
+    enabled: true
+    schedule: "cron(0 8 ? * MON *)"
+    max_jobs_per_company: 250
+
+  smartrecruiters:
+    enabled: true
+    schedule: "cron(0 8 ? * MON *)"
+    max_jobs_per_company: 250
+
+  workday:
+    enabled: true
+    schedule: "cron(0 9 ? * MON *)"
+    max_jobs_per_company: 250
+
+  # --------------------------------------------------------------------
+  # apify_linkedin — . Daily LinkedIn scrape via Apify
+  # (metered, pay-per-result). Token lives in SSM at
+  # `/jobs-aggregator/apify_token`.
+  #
+  # COST WARNING: charges are USD ~$0.005 per result. A wide daily
+  # sweep (16 searches × 50 results × 30 days × $0.005) is ~$120/month.
+  # Start narrow; scale up after you see the signal.
+  # --------------------------------------------------------------------
+  apify_linkedin:
+    enabled: true
+    actor_id: "bebity~linkedin-jobs-scraper"
+    ssm_token_param: "apify_token"
+    count_per_search: 50
+    poll_interval_secs: 6
+    poll_timeout_secs: 240
+    schedule: "cron(0 12 * * ? *)"   # daily at 12:00 UTC
+
+    # [USER] — REWRITE THESE. Each entry is a LinkedIn job search URL.
+    # Build them in a browser:
+    #   1. Run the search on linkedin.com/jobs with the filters you want.
+    #   2. Copy the URL.
+    #   3. Paste it as `url`.
+    # Common filter params (documented inline):
+    #   f_TPR=r86400      posted in last 24h (3600=1h, 604800=7d)
+    #   f_E=4,5,6         experience level (4=Mid-Senior, 5=Director, 6=Executive)
+    #   f_WT=1,2,3        workplace (1=on-site, 2=remote, 3=hybrid)
+    #   geoId=103644278   United States (broad)
+    #   geoId=103743442   Austin, Texas metro
+    searches:
+      - name: "staff_backend_remote_us"
+        url: "https://www.linkedin.com/jobs/search/?keywords=%22staff%20engineer%22%20OR%20%22principal%20engineer%22&f_TPR=r86400&f_WT=2&geoId=103644278"
+      - name: "platform_engineer_austin"
+        url: "https://www.linkedin.com/jobs/search/?keywords=%22platform%20engineer%22%20OR%20%22infrastructure%20engineer%22&f_TPR=r86400&geoId=103743442"
+      - name: "distributed_systems_senior"
+        url: "https://www.linkedin.com/jobs/search/?keywords=%22distributed%20systems%22%20senior&f_TPR=r86400&f_WT=2&geoId=103644278"
