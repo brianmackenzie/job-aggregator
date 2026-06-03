@@ -47,6 +47,11 @@ class FractionalJobsScraper(BaseScraper):
     source_name = "fractional_jobs"
     schedule = "cron(30 6 * * ? *)"      # 06:30 UTC daily
     rate_limit_rps = 1.0
+    # 2026-06-03: detail-page descriptions (the listing/card omits the JD).
+    # scrape_run fetches RawJob.url + extracts JSON-LD first, then this
+    # CSS selector; populates QoL keyword scoring + the semantic pass.
+    auto_fetch_description = True
+    _DESC_SELECTOR = 'main'
 
     BASE_URL  = "https://www.fractionaljobs.io"
     # Note: as of 2026-04 the homepage IS the jobs listing (single-page site).

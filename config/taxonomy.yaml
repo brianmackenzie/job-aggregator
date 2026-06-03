@@ -296,12 +296,54 @@ company_groups:
       - "planetscale"
 
 # --------------------------------------------------------------------
-# qol — quality-of-life weights applied by the QoL scorer.
+# qol — quality-of-life score (0-100). Deterministic; computed on every
+# scrape + rescore. Each weight is ADDED when its trigger fires; the
+# weights sum to <=100. The equity/benefits/flexibility weights scan the
+# job DESCRIPTION, so they only fire when descriptions are captured
+# (Workday + most boards fetch them; see scrapers/base.py).
 # --------------------------------------------------------------------
 qol:
-  salary_floor:        180000  # roles below this get a hard QoL drop
-  work_mode_remote:    25       # remote preferred for Alex
-  work_mode_hybrid:    18
-  work_mode_onsite:     5
-  crunch_penalty:      20
-  commute_distance_penalty_per_mile: 0.5
+  weights:
+    work_mode_remote:        25   # work_mode == remote
+    work_mode_hybrid:        15   # work_mode == hybrid
+    salary_listed:           20   # salary_min OR salary_max present + non-zero
+    salary_above_floor:      15   # salary_min >= salary_floor (below)
+    posted_recent:           10   # posted_at within posted_recent_days of now
+    equity_keywords:         10   # any equity keyword in the description
+    benefits_keywords:       10   # any benefits keyword in the description
+    flexibility_keywords:    10   # any flexibility keyword in the description
+  salary_floor:              150000   # set to the low end of YOUR target comp
+  posted_recent_days:        14
+  keywords:
+    equity:
+      - "equity"
+      - "stock options"
+      - "stock grant"
+      - "rsu"
+      - "rsus"
+      - "restricted stock"
+      - "stock award"
+    benefits:
+      - "parental leave"
+      - "maternity leave"
+      - "paternity leave"
+      - "comprehensive benefits"
+      - "comprehensive medical"
+      - "401(k) match"
+      - "401k match"
+      - "wellness stipend"
+      - "fertility benefits"
+      - "adoption assistance"
+      - "sabbatical"
+      - "unlimited pto"
+      - "unlimited vacation"
+    flexibility:
+      - "flexible hours"
+      - "flexible schedule"
+      - "4-day"
+      - "four-day workweek"
+      - "asynchronous"
+      - "async-first"
+      - "work-life balance"
+      - "no on-call"
+      - "results-only"

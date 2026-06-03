@@ -55,6 +55,11 @@ class BuiltInNYCScraper(BaseScraper):
     source_name = "builtinnyc"
     schedule = "cron(30 6 * * ? *)"
     rate_limit_rps = 0.5
+    # 2026-06-03: detail-page descriptions (the listing/card omits the JD).
+    # scrape_run fetches RawJob.url + extracts JSON-LD first, then this
+    # CSS selector; populates QoL keyword scoring + the semantic pass.
+    auto_fetch_description = True
+    _DESC_SELECTOR = 'main'
 
     BASE_URL = "https://www.builtinnyc.com"
     LIST_URL = "https://www.builtinnyc.com/jobs"

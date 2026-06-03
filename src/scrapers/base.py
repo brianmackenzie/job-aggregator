@@ -16,10 +16,12 @@ import gzip
 import io
 import json
 import os
+import re
 import time
 import traceback
 import uuid
 from abc import ABC, abstractmethod
+from html import unescape as _html_unescape
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -35,6 +37,92 @@ from common.normalize import (
     normalize_company,
     score_posted_sk,
 )
+
+
+def strip_html(html: Optional[str], max_chars: int = 12000) -> Optional[str]:
+    """HTML (or plain text) -> collapsed plain text, capped at max_chars.
+
+    Turns ATS/board job-description HTML into the plain-text `description`
+    the scoring engine + QoL keyword scan expect. bs4 is imported lazily so
+    base.py stays importable in minimal test envs; a regex tag-strip is the
+    fallback. Returns None for empty/whitespace-only input so normalize
+    omits the field instead of storing an empty attribute.
+    """
+    if not html:
+        return None
+    try:
+        from bs4 import BeautifulSoup  # lazy: keep base.py import light
+        text = BeautifulSoup(html, "html.parser").get_text(" ", strip=True)
+    except Exception:
+        text = re.sub(r"<[^>]+>", " ", html)
+    text = re.sub(r"\s+", " ", text or "").strip
+    if not text:
+        return None
+    return text[:max_chars]
+
+
+def _iter_jsonld(node):
+    """Yield every dict node in a parsed JSON-LD blob (handles top-level
+    lists and @graph nesting)."""
+    if isinstance(node, list):
+        for x in node:
+            yield from _iter_jsonld(x)
+    elif isinstance(node, dict):
+        yield node
+        graph = node.get("@graph")
+        if graph:
+            yield from _iter_jsonld(graph)
+
+
+def extract_job_description(html, css_selector=None, max_chars: int = 12000):
+    """Pull a job description out of a detail page, robustly.
+
+    Strategy, in order:
+      1. JSON-LD `JobPosting.description` — the Google-for-Jobs structured
+         data many boards embed. Stable across redesigns; preferred.
+      2. A per-board CSS selector fallback (the JD container) for boards
+         that don't emit JSON-LD.
+    Returns plain text (via strip_html) or None. Best-effort: never raises.
+    """
+    if not html:
+        return None
+    try:
+        from bs4 import BeautifulSoup  # lazy
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        return strip_html(html, max_chars)
+
+    # 1) JSON-LD JobPosting.description
+    for s in soup.find_all("script", type="application/ld+json"):
+        raw = (s.string or s.get_text or "").strip
+        if not raw or "JobPosting" not in raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except Exception:
+            continue
+        for node in _iter_jsonld(data):
+            tp = node.get("@type")
+            types = tp if isinstance(tp, list) else [tp]
+            if "JobPosting" in types and node.get("description"):
+                # JSON-LD descriptions are commonly HTML-entity-encoded
+                # (&lt;p&gt;...). Unescape first so strip_html sees real tags
+                # to strip, not literal angle-brackets in the text.
+                d = strip_html(_html_unescape(node["description"]), max_chars)
+                if d:
+                    return d
+
+    # 2) CSS selector fallback
+    if css_selector:
+        try:
+            el = soup.select_one(css_selector)
+        except Exception:
+            el = None
+        if el:
+            d = strip_html(str(el), max_chars)
+            if d:
+                return d
+    return None
 
 
 @dataclass
@@ -69,6 +157,14 @@ class BaseScraper(ABC):
     # Max requests/sec inside fetch. Subclasses call self._throttle between
     # HTTP calls to respect this.
     rate_limit_rps: float = 1.0
+    # Generic detail-page description enrichment (opt-in). When True,
+    # scrape_run fetches each job's detail page (RawJob.url) and extracts
+    # the description (JSON-LD first, then _DESC_SELECTOR) whenever parse
+    # didn't already set one. For boards whose list/card payload omits the
+    # JD. Bounded by max_desc_fetches/run; throttled; best-effort.
+    auto_fetch_description: bool = False
+    _DESC_SELECTOR = None             # CSS fallback used when JSON-LD absent
+    max_desc_fetches: int = 1000      # per-run ceiling on detail fetches
 
     def __init__(self):
         if not self.source_name:
@@ -99,6 +195,38 @@ class BaseScraper(ABC):
         if elapsed < min_interval:
             time.sleep(min_interval - elapsed)
         self._last_request_at = time.monotonic
+
+    def _fetch_detail_description(self, url, css_selector=None,
+                                 extra_headers=None):
+        """GET a job's detail page and extract its description (JSON-LD
+        first, then css_selector). Throttled; best-effort (any error ->
+        None). Shared by board scrapers (live fetch) and the backfill
+        script, so both extract descriptions identically.
+        """
+        if not url:
+            return None
+        import requests  # lazy: keep base.py importable without requests
+        headers = {
+            "User-Agent": getattr(self, "USER_AGENT", None) or (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120 Safari/537.36"),
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        if extra_headers:
+            headers.update(extra_headers)
+        self._throttle
+        try:
+            resp = requests.get(url, headers=headers, timeout=30)
+            resp.raise_for_status
+            # requests defaults to ISO-8859-1 for text/html without a declared
+            # charset, which mojibakes UTF-8 curly quotes; prefer the detected
+            # encoding so the description text is clean.
+            if not resp.encoding or resp.encoding.lower == "iso-8859-1":
+                resp.encoding = resp.apparent_encoding or "utf-8"
+        except Exception:
+            return None
+        return extract_job_description(resp.text, css_selector)
 
     def normalize(self, job: RawJob) -> dict:
         """RawJob -> Jobs-table row dict. Subclasses rarely override."""
@@ -274,6 +402,7 @@ class BaseScraper(ABC):
         errors: list[str] = 
         raw_payloads: list[dict] = 
         status = "ok"
+        self._desc_fetches = 0   # per-run detail-fetch budget counter
 
         log.info("scrape_run_start", source=self.source_name)
 
@@ -286,6 +415,17 @@ class BaseScraper(ABC):
                     if raw is None:
                         # Parser chose to skip — not an error.
                         continue
+                    # Generic description enrichment (opt-in). Boards whose
+                    # list/card payload lacks the JD set auto_fetch_description;
+                    # we fetch the detail page (RawJob.url) once — JSON-LD first,
+                    # then _DESC_SELECTOR — when parse left description empty.
+                    # Bounded + throttled + best-effort (failure -> stays None).
+                    if (self.auto_fetch_description and not raw.description
+                            and raw.url
+                            and self._desc_fetches < self.max_desc_fetches):
+                        self._desc_fetches += 1
+                        raw.description = self._fetch_detail_description(
+                            raw.url, self._DESC_SELECTOR)
                     row = self.normalize(raw)
                     # Score the job before persisting. Wrapped in try/except
                     # so a scoring bug never silently drops a job from the feed.

@@ -42,6 +42,11 @@ class HitmarkerScraper(BaseScraper):
     source_name = "hitmarker"
     schedule = "cron(30 6 * * ? *)"
     rate_limit_rps = 0.5
+    # 2026-06-03: detail-page descriptions (the listing/card omits the JD).
+    # scrape_run fetches RawJob.url + extracts JSON-LD first, then this
+    # CSS selector; populates QoL keyword scoring + the semantic pass.
+    auto_fetch_description = True
+    _DESC_SELECTOR = 'div.prose'
 
     BASE_URL = "https://hitmarker.net"
     LIST_URL = "https://hitmarker.net/jobs"

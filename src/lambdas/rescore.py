@@ -252,12 +252,23 @@ def handler(event, context):
                 # skipping them turns a full-table rewrite into "write only
                 # what moved". Gated by do_skip_unchanged (off for dry_run /
                 # force_write / force_semantic).
+                #
+                # 2026-06-03: also refresh when the deterministic QoL score
+                # drifted. QoL depends on work_mode / posted_at / salary /
+                # description, which a re-scrape can change WITHOUT moving the
+                # final score+track — in which case the old guard skipped the
+                # write and left qol_score stale (observed ~4% of rows). We
+                # only break the skip when qol actually changed, so true no-op
+                # rows still cost zero WCU.
                 if do_skip_unchanged:
                     old_score = item.get("score")
                     old_track = item.get("track") or ""
+                    old_qol   = int(item.get("qol_score") or 0)
+                    new_qol   = int(result.get("qol_score") or 0)
                     if (old_score is not None
                             and int(old_score) == int(new_score)
-                            and old_track == (new_track or "")):
+                            and old_track == (new_track or "")
+                            and old_qol == new_qol):
                         unchanged_skipped += 1
                         continue
 

@@ -73,6 +73,11 @@ class InGameJobScraper(BaseScraper):
     source_name = "ingamejob"
     schedule = "cron(30 6 * * ? *)"      # 06:30 UTC daily, with HTML batch
     rate_limit_rps = 1.0
+    # 2026-06-03: detail-page descriptions (the listing/card omits the JD).
+    # scrape_run fetches RawJob.url + extracts JSON-LD first, then this
+    # CSS selector; populates QoL keyword scoring + the semantic pass.
+    auto_fetch_description = True
+    _DESC_SELECTOR = 'div.job-view-single-section'
 
     BASE_URL  = "https://ingamejob.com"
     LIST_URL  = "https://ingamejob.com/en/jobs"

@@ -31,12 +31,19 @@ failure) are LOGGED + SWALLOWED. The scraper continues on to the next
 tenant. This honors the "never hard-fail a scrape" rule (CLAUDE.md) and
 matches how Greenhouse / Lever handle 404s.
 
-We do NOT fetch detail pages. The list endpoint already gives us title,
-location, externalPath (for the click-through URL), and a relative
-"Posted N days ago" string. Hitting the per-job detail endpoint would
-double the request volume and many tenants 403 / rate-limit on it.
-The scoring engine works fine with title + company + location alone;
-the description is just a bonus signal.
+The list endpoint gives us title, location, externalPath (the click-through
+URL), and a relative "Posted N days ago" string but NO description. As of
+2026-06-03 we DO fetch the per-job cxs detail endpoint
+(`{base_url}/wday/cxs/{tenant}/{site}{externalPath}` ->
+jobPostingInfo.jobDescription) to capture the description, because an empty
+description silently zeroes the QoL equity/benefits/flexibility signals AND
+starves the semantic (Haiku) pass — Workday is ~100% of the empty-description
+rows. This is gated by `fetch_descriptions` (default on) and bounded per run
+by _DEFAULT_MAX_DETAIL_FETCHES so a many-tenant run can't exceed the Lambda
+timeout; the one-time backfill of the existing corpus runs outside Lambda via
+scripts/backfill_descriptions.py. Detail fetches are throttled like list
+requests and best-effort (any error -> description stays None). The scoring
+engine still works with title + company + location alone if a fetch fails.
 
 Workday's "postedOn" field is a human-readable string ("Posted Today",
 "Posted Yesterday", "Posted 5 Days Ago", "Posted 30+ Days Ago"). We
@@ -51,7 +58,7 @@ import requests
 
 from common.logging import log
 from scrapers.ats_companies import load_ats_companies
-from scrapers.base import BaseScraper, RawJob
+from scrapers.base import BaseScraper, RawJob, strip_html
 from scrapers.registry import register
 from scrapers.user_agent import USER_AGENT as _USER_AGENT
 
@@ -96,6 +103,58 @@ def _parse_posted_on(s: str) -> Optional[str]:
     return posted.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# Per-run ceiling on detail-page fetches. Each description costs one extra
+# GET (throttled at rate_limit_rps), so an unbounded fetch across many
+# tenants would blow the Lambda's 15-min ceiling. 500 details at 1 rps is
+# ~8 min, leaving headroom for list paging. The one-time backfill of the
+# existing corpus runs outside Lambda via scripts/backfill_descriptions.py
+# (no timeout). Tune by editing this constant.
+_DEFAULT_MAX_DETAIL_FETCHES = 500
+
+
+def fetch_workday_description(
+    base_url: str,
+    tenant: str,
+    site: str,
+    external_path: str,
+    headers: dict,
+    timeout: int = 30,
+) -> Optional[str]:
+    """GET the Workday 'cxs' job-detail endpoint; return the posting's
+    description as plain text, or None on any failure.
+
+    The detail endpoint mirrors the list endpoint's tenant/site path:
+        {base_url}/wday/cxs/{tenant}/{site}{external_path}
+    and returns JSON shaped like:
+        {"jobPostingInfo": {"jobDescription": "<html>...", ...}, ...}
+    (shape confirmed live 2026-06-03 against gartner.wd5).
+
+    Best-effort by contract: a missing description is a degraded signal,
+    never a hard failure, so every error path returns None. Shared by the
+    live scraper and scripts/backfill_descriptions.py.
+    """
+    if not (base_url and tenant and site and external_path):
+        return None
+    if not external_path.startswith("/"):
+        external_path = "/" + external_path
+    detail_url = f"{base_url}/wday/cxs/{tenant}/{site}{external_path}"
+    try:
+        resp = requests.get(detail_url, headers=headers, timeout=timeout)
+    except Exception as exc:
+        log.warn("workday_detail_request_failed", url=detail_url, error=str(exc))
+        return None
+    if not resp.ok:
+        log.warn("workday_detail_status", url=detail_url, status=resp.status_code)
+        return None
+    try:
+        data = resp.json
+    except Exception as exc:
+        log.warn("workday_detail_json_failed", url=detail_url, error=str(exc))
+        return None
+    info = (data or {}).get("jobPostingInfo") or {}
+    return strip_html(info.get("jobDescription") or "")
+
+
 @register("workday")
 class WorkdayScraper(BaseScraper):
     source_name    = "workday"
@@ -108,6 +167,13 @@ class WorkdayScraper(BaseScraper):
     # config/sources.yaml:scraper_defaults. Change that field, not this line.
     USER_AGENT = _USER_AGENT
 
+    # Detail-page descriptions: the list endpoint omits the JD, so when this
+    # is on we fetch each posting's cxs detail endpoint (one extra GET each,
+    # bounded by _DEFAULT_MAX_DETAIL_FETCHES/run). On by default; the
+    # description feeds QoL keyword scoring + the semantic pass. Set False if
+    # a tenant rate-limits the detail endpoint.
+    fetch_descriptions = True
+
     # ----- fetch -----------------------------------------------------------
 
     def fetch(self) -> Iterable[dict]:
@@ -119,6 +185,9 @@ class WorkdayScraper(BaseScraper):
         `_workday` (base_url / tenant / site so parse can build the
         click-through URL without re-reading the YAML).
         """
+        # Per-run detail-fetch budget (see _DEFAULT_MAX_DETAIL_FETCHES).
+        self._detail_fetches = 0
+
         companies = load_ats_companies("workday")
         if not companies:
             # No Workday tenants configured yet is a valid state — this
@@ -258,6 +327,18 @@ class WorkdayScraper(BaseScraper):
                     "tenant":   tenant,
                     "site":     site,
                 }
+                # Detail-page description (bonus signal for QoL + semantic).
+                # Bounded per run; throttled like any other request. Counter
+                # is initialised in fetch; getattr keeps direct unit-test
+                # calls of _page_through safe.
+                fetched = getattr(self, "_detail_fetches", 0)
+                ext = posting.get("externalPath") or ""
+                if self.fetch_descriptions and ext and fetched < _DEFAULT_MAX_DETAIL_FETCHES:
+                    self._throttle
+                    self._detail_fetches = fetched + 1
+                    posting["_description"] = fetch_workday_description(
+                        base_url, tenant, site, ext, headers,
+                    )
                 yield posting
                 seen += 1
                 if seen >= max_jobs:
@@ -321,7 +402,9 @@ class WorkdayScraper(BaseScraper):
             company     = company_name,
             url         = url,
             location    = location,
-            description = None,    # Not in list response; see module docstring
+            # Populated by _page_through via fetch_workday_description when
+            # fetch_descriptions is on; None if disabled / capped / failed.
+            description = payload.get("_description"),
             posted_at   = posted_at,
             remote      = None,    # Workday has no structured remote flag
             raw         = {

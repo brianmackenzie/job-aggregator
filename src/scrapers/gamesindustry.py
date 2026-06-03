@@ -56,6 +56,10 @@ class GamesIndustryScraper(BaseScraper):
     source_name = "gamesindustry"
     schedule = "cron(30 6 * * ? *)"
     rate_limit_rps = 0.5
+    # 2026-06-03: detail-page descriptions (listing omits JD).
+    # scrape_run fetches RawJob.url + JSON-LD first, then this selector.
+    auto_fetch_description = True
+    _DESC_SELECTOR = 'div.prose'
 
     BASE_URL = "https://jobs.gamesindustry.biz"
     LIST_URL = "https://jobs.gamesindustry.biz/jobs"

@@ -33,7 +33,7 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
-from scrapers.base import BaseScraper, RawJob
+from scrapers.base import BaseScraper, RawJob, strip_html
 from scrapers.registry import register
 from scrapers.sources_config import load_source_config
 
@@ -67,6 +67,15 @@ class GameJobsUKScraper(BaseScraper):
     )
     DEFAULT_MAX_PAGES   = 4   # 4 * 15 = 60 jobs per run
     PAGE_SIZE           = 15  # site is hard-coded to this — don't change
+
+    # Detail-page descriptions: the listing cards carry no JD, which leaves
+    # gaming roles (the original author's core lane) scored on title alone. When on, we
+    # fetch each card's detail page and pull the job body. The JD lives in
+    # `div.rich-text-content` (confirmed live 2026-06-03). One extra GET per
+    # card, throttled; capped by max_pages (default 60 jobs/run) so volume
+    # stays small. Best-effort: any failure -> description stays None.
+    fetch_descriptions = True
+    _DESC_SELECTOR      = "div.rich-text-content"
 
     def fetch(self) -> Iterable[dict]:
         cfg = load_source_config(self.source_name)
@@ -112,13 +121,42 @@ class GameJobsUKScraper(BaseScraper):
                     continue
                 seen_ids.add(job_id)
                 new_count += 1
-                yield {
+                href = card.get("href") or f"/jobs?job_id={job_id}"
+                payload = {
                     "_job_id": str(job_id),
-                    "_href":   card.get("href") or f"/jobs?job_id={job_id}",
+                    "_href":   href,
                     "_html":   str(card),
                 }
+                if self.fetch_descriptions:
+                    payload["_description"] = self._fetch_description(
+                        urljoin(self.BASE_URL, href)
+                    )
+                yield payload
             if new_count == 0:
                 break
+
+    def _fetch_description(self, detail_url: str) -> Optional[str]:
+        """GET a job's detail page and return the JD body as plain text.
+
+        The description lives in `div.rich-text-content`. Throttled like any
+        request; best-effort (any error / missing selector -> None).
+        """
+        self._throttle
+        try:
+            resp = requests.get(
+                detail_url,
+                headers={
+                    "User-Agent": self.USER_AGENT,
+                    "Accept":     "text/html",
+                    "Referer":    self.LIST_URL,
+                },
+                timeout=30,
+            )
+            resp.raise_for_status
+        except requests.RequestException:
+            return None
+        el = BeautifulSoup(resp.text, "html.parser").select_one(self._DESC_SELECTOR)
+        return strip_html(str(el)) if el else None
 
     def parse(self, payload: dict) -> Optional[RawJob]:
         job_id = payload.get("_job_id") or ""
@@ -189,7 +227,7 @@ class GameJobsUKScraper(BaseScraper):
             company=company,
             url=url,
             location=location,
-            description=None,
+            description=payload.get("_description"),  # detail-page JD (best-effort)
             posted_at=posted_at,
             remote=remote,
             raw=payload,
