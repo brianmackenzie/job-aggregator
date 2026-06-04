@@ -21,7 +21,7 @@ Supported sources (must be description-wired):
 Use --source all-boards to do every board (skips workday).
 
 Usage (PowerShell):
-    $env:JOBS_TABLE = "jobs-aggregator-JobsTable-1EV6UZWFB7MVY"
+    $env:JOBS_TABLE = "REDACTED_DDB_TABLE"
     python scripts/backfill_descriptions.py --source workday --limit 20 --dry-run
     python scripts/backfill_descriptions.py --source workday
     python scripts/backfill_descriptions.py --source all-boards

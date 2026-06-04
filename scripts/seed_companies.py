@@ -7,7 +7,7 @@ Usage (from the repo root):
     python scripts/seed_companies.py
 
 Prerequisites:
-    - AWS credentials configured (deploy-jobs IAM user or equivalent)
+    - AWS credentials configured (REDACTED_IAM_USER IAM user or equivalent)
     - Stack deployed (COMPANIES_TABLE env var not required — script queries
       CloudFormation for the table name automatically)
     - pyyaml installed: pip install pyyaml

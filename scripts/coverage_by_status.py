@@ -8,7 +8,7 @@ import os
 import concurrent.futures
 import boto3
 
-TABLE = os.environ.get("JOBS_TABLE", "jobs-aggregator-JobsTable-1EV6UZWFB7MVY")
+TABLE = os.environ.get("JOBS_TABLE", "REDACTED_DDB_TABLE")
 ddb = boto3.client("dynamodb", region_name="us-east-1")
 
 

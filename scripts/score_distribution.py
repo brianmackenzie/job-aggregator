@@ -9,7 +9,7 @@ Scans the Jobs table and prints:
 import boto3
 
 REGION = "us-east-1"
-TABLE  = "jobs-aggregator-JobsTable-1EV6UZWFB7MVY"
+TABLE  = "REDACTED_DDB_TABLE"
 
 ddb   = boto3.resource("dynamodb", region_name=REGION)
 table = ddb.Table(TABLE)

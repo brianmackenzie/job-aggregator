@@ -35,7 +35,7 @@ maintenance workflow:
 How to run
 ----------
     # PowerShell / any shell - pass the table env var:
-    $env:JOBS_TABLE="jobs-aggregator-JobsTable-1EV6UZWFB7MVY"
+    $env:JOBS_TABLE="REDACTED_DDB_TABLE"
     python scripts/export_semantic_review.py
 
     # Optional flags:
