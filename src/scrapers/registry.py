@@ -11,9 +11,9 @@ Usage:
         ...
 
     cls = get_scraper("remoteok")
-    cls.scrape_run
+    cls().scrape_run()
 
-The worker Lambda uses get_scraper to resolve a class by name from
+The worker Lambda uses get_scraper() to resolve a class by name from
 the event payload. Scraper modules must be imported somewhere for
 their @register decorator to fire — the worker Lambda does this at
 module import time so all scrapers are registered by first invocation.
@@ -42,16 +42,16 @@ def get_scraper(source_name: str) -> type:
     if source_name not in _registry:
         raise KeyError(
             f"No scraper registered for {source_name!r}. "
-            f"Known: {sorted(_registry.keys)}"
+            f"Known: {sorted(_registry.keys())}"
         )
     return _registry[source_name]
 
 
-def list_scrapers -> list[str]:
+def list_scrapers() -> list[str]:
     """All registered scraper names. Used by health/debug endpoints."""
-    return sorted(_registry.keys)
+    return sorted(_registry.keys())
 
 
-def _reset_for_tests -> None:
+def _reset_for_tests() -> None:
     """Drop the registry — used between tests so each test starts clean."""
-    _registry.clear
+    _registry.clear()

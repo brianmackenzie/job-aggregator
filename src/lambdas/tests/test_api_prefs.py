@@ -52,13 +52,13 @@ def test_put_overwrites_existing_value(aws):
 
 def test_put_accepts_empty_list_to_clear(aws):
     db.put_pref("owner", "hidden_companies", ["x"])
-    handler(_event("PUT", {"config_key": "hidden_companies", "value": }), None)
+    handler(_event("PUT", {"config_key": "hidden_companies", "value": []}), None)
     got = json.loads(handler(_event("GET"), None)["body"])
-    assert got["prefs"]["hidden_companies"] == 
+    assert got["prefs"]["hidden_companies"] == []
 
 
 def test_put_rejects_missing_config_key(aws):
-    resp = handler(_event("PUT", {"value": }), None)
+    resp = handler(_event("PUT", {"value": []}), None)
     assert resp["statusCode"] == 400
 
 
@@ -99,7 +99,7 @@ def test_put_with_unknown_config_key_still_succeeds(aws):
 # ----- hardening: bound key length + value size -------------------
 
 def test_put_rejects_oversized_key(aws):
-    resp = handler(_event("PUT", {"config_key": "k" * 129, "value": }), None)
+    resp = handler(_event("PUT", {"config_key": "k" * 129, "value": []}), None)
     assert resp["statusCode"] == 400
     assert "too long" in json.loads(resp["body"])["error"]
     # Nothing stored.

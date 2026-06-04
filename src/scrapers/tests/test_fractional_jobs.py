@@ -1,22 +1,22 @@
-"""Tests for src/scrapers/fractional_jobs.py — parse against fixture HTML.
+"""Tests for src/scrapers/fractional_jobs.py — parse() against fixture HTML.
 
-No HTTP. fetch is exercised by the live smoke test.
+No HTTP. fetch() is exercised by the live smoke test.
 """
 from scrapers.fractional_jobs import FractionalJobsScraper, _clean
 
 
 # ---------- _clean ---------------------------------------------------------
 
-def test_clean_collapses_whitespace:
+def test_clean_collapses_whitespace():
     assert _clean("Hello\n\n  world\t!") == "Hello world !"
 
 
-def test_clean_handles_empty:
+def test_clean_handles_empty():
     assert _clean("") == ""
     assert _clean(None) == ""
 
 
-# ---------- parse --------------------------------------------------------
+# ---------- parse() --------------------------------------------------------
 
 # Minimal fixture HTML modeled on the actual fractionaljobs.io DOM. We only
 # care about the structural shape: h2 = title, then short text nodes for
@@ -60,9 +60,9 @@ def _payload(html: str = _CARD_HTML, href: str = "/jobs/fractional-cto-acme"):
     }
 
 
-def test_parse_canonical_card:
-    s   = FractionalJobsScraper
-    raw = s.parse(_payload)
+def test_parse_canonical_card():
+    s   = FractionalJobsScraper()
+    raw = s.parse(_payload())
     assert raw is not None
     assert raw.native_id == "fractional-cto-acme"
     assert raw.title     == "Fractional CTO"
@@ -72,8 +72,8 @@ def test_parse_canonical_card:
     assert raw.url       == "https://www.fractionaljobs.io/jobs/fractional-cto-acme"
 
 
-def test_parse_city_state_location:
-    s   = FractionalJobsScraper
+def test_parse_city_state_location():
+    s   = FractionalJobsScraper()
     raw = s.parse(_payload(html=_CARD_HTML_WITH_CITY,
                             href="/jobs/fractional-vp-eng-example"))
     assert raw is not None
@@ -84,19 +84,19 @@ def test_parse_city_state_location:
     assert raw.remote is None
 
 
-def test_parse_skips_when_no_title:
+def test_parse_skips_when_no_title():
     """Card with no h1/h2/h3 → skip rather than fabricate a title."""
-    s = FractionalJobsScraper
+    s = FractionalJobsScraper()
     assert s.parse(_payload(html=_CARD_HTML_NO_TITLE,
                              href="/jobs/no-title")) is None
 
 
-def test_parse_skips_when_href_blank:
-    s = FractionalJobsScraper
+def test_parse_skips_when_href_blank():
+    s = FractionalJobsScraper()
     assert s.parse({"_href": "", "_url": "", "_html": _CARD_HTML}) is None
 
 
-def test_parse_skips_long_description_as_company:
+def test_parse_skips_long_description_as_company():
     """A very long text node should be treated as description, not company."""
     long_card = """
     <a href="/jobs/x">
@@ -107,7 +107,7 @@ def test_parse_skips_long_description_as_company:
       <span>Remote</span>
     </a>
     """
-    s = FractionalJobsScraper
+    s = FractionalJobsScraper()
     raw = s.parse(_payload(html=long_card, href="/jobs/x"))
     # No short text node qualifies as company → skip.
     assert raw is None
@@ -141,9 +141,9 @@ _LIVE_CARD_HTML = """
 """
 
 
-def test_parse_live_fractional_jobs_card_shape:
+def test_parse_live_fractional_jobs_card_shape():
     """Locked-in fixture from a real 2026-04 listing payload."""
-    s   = FractionalJobsScraper
+    s   = FractionalJobsScraper()
     raw = s.parse({
         "_href": "/jobs/senior-full-stack-engineer-at-a-small-business-acquisition-marketplace",
         "_url":  "https://www.fractionaljobs.io/jobs/senior-full-stack-engineer-at-a-small-business-acquisition-marketplace",

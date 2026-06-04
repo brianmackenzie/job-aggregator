@@ -64,7 +64,7 @@ class AshbyScraper(BaseScraper):
                 continue
 
             url = f"{self.API_BASE}/{slug}"
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     url,
@@ -80,8 +80,8 @@ class AshbyScraper(BaseScraper):
                         hint="Verify at jobs.ashbyhq.com/" + slug,
                     )
                     continue
-                resp.raise_for_status
-                data = resp.json
+                resp.raise_for_status()
+                data = resp.json()
             except Exception as exc:
                 # Per the "never hard-fail a scrape run" rule (CLAUDE.md),
                 # a single bad company must NOT kill the rest. Log + skip.
@@ -97,13 +97,13 @@ class AshbyScraper(BaseScraper):
             # Ashby wraps postings in a "jobs" key (NOT "jobPostings" — older
             # Ashby docs used that name, but the live API as of 2026-04 returns
             # `{"jobs": [...], "apiVersion": ...}`). Defensive: accept either.
-            postings = data.get("jobs") or data.get("jobPostings") or 
+            postings = data.get("jobs") or data.get("jobPostings") or []
             if not isinstance(postings, list):
                 from common.logging import log
                 log.warn(
                     "ashby_unexpected_response",
                     slug=slug,
-                    keys=list(data.keys) if isinstance(data, dict) else None,
+                    keys=list(data.keys()) if isinstance(data, dict) else None,
                 )
                 continue
 
@@ -132,10 +132,10 @@ class AshbyScraper(BaseScraper):
           descriptionPlain → description (Ashby always provides plain text)
           applyUrl         → url
           publishedAt      → posted_at (ISO8601 string or null)
-          _company_meta    → enrichment from fetch
+          _company_meta    → enrichment from fetch()
         """
         posting_id = payload.get("id")
-        title      = (payload.get("title") or "").strip
+        title      = (payload.get("title") or "").strip()
         if not posting_id or not title:
             return None
 
@@ -150,10 +150,10 @@ class AshbyScraper(BaseScraper):
         remote   = bool(is_remote) if is_remote is not None else None
 
         # Plain text description — Ashby includes this on all postings.
-        description = (payload.get("descriptionPlain") or "").strip or None
+        description = (payload.get("descriptionPlain") or "").strip() or None
 
-        # publishedAt is ISO8601 or None. BaseScraper.normalize calls
-        # canonicalize_posted_at which handles both.
+        # publishedAt is ISO8601 or None. BaseScraper.normalize() calls
+        # canonicalize_posted_at() which handles both.
         posted_at = payload.get("publishedAt") or None
 
         # Ashby's applyUrl is the canonical apply link.
@@ -176,7 +176,7 @@ class AshbyScraper(BaseScraper):
 
     def normalize(self, job: RawJob) -> dict:
         """Inject company_tier into the row for scoring modifiers."""
-        row = super.normalize(job)
+        row = super().normalize(job)
         if job.raw:
             tier = job.raw.get("company_tier")
             if tier:

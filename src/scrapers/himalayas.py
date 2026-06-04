@@ -26,16 +26,16 @@ class HimalayasScraper(BaseScraper):
 
     def fetch(self) -> Iterable[dict]:
         for page in range(self.MAX_PAGES):
-            self._throttle
+            self._throttle()
             resp = requests.get(
                 self.API_URL,
                 params={"limit": self.PAGE_SIZE, "offset": page * self.PAGE_SIZE},
                 headers={"Accept": "application/json"},
                 timeout=30,
             )
-            resp.raise_for_status
-            payload = resp.json
-            jobs = payload.get("jobs") or payload.get("data") or 
+            resp.raise_for_status()
+            payload = resp.json()
+            jobs = payload.get("jobs") or payload.get("data") or []
             if not jobs:
                 break
             for job in jobs:

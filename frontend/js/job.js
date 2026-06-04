@@ -9,7 +9,7 @@
      * Company-link target is /index.html?companies=<name>.
    ===================================================================== */
 
-document.addEventListener('DOMContentLoaded', async  => {
+document.addEventListener('DOMContentLoaded', async () => {
   const titleEl    = document.getElementById('job-title');
   const subtitleEl = document.getElementById('job-subtitle');
   const metaEl     = document.getElementById('job-meta');
@@ -34,11 +34,11 @@ document.addEventListener('DOMContentLoaded', async  => {
   Api.get('/taxonomy').then(t => {
     taxonomy = t;
     if (current) renderTags(current);   // re-render tags once labels available
-  }).catch( => { /* non-fatal */ });
+  }).catch(() => { /* non-fatal */ });
 
   let current = null;       // current job row, refreshed after each action
 
-  async function load {
+  async function load() {
     try {
       const data = await Api.get('/jobs/' + encodeURIComponent(jobId));
       current = data.job;
@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', async  => {
     titleEl.textContent = j.title || '(no title)';
 
     // Company name -> tappable filter link to /index.html
-    const company = (j.company || '').trim;
+    const company = (j.company || '').trim();
     if (company) {
       const href = '/index.html?companies=' + encodeURIComponent(company);
       subtitleEl.innerHTML =
@@ -69,10 +69,10 @@ document.addEventListener('DOMContentLoaded', async  => {
     }
 
     // ---- Meta panel: location, posted, source, status, etc. ----
-    const m = ;
+    const m = [];
     if (j.location) m.push(['Location', j.location]);
     if (j.work_mode && j.work_mode !== 'unclear') {
-      m.push(['Work mode', j.work_mode.charAt(0).toUpperCase + j.work_mode.slice(1)]);
+      m.push(['Work mode', j.work_mode.charAt(0).toUpperCase() + j.work_mode.slice(1)]);
     }
     if (j.posted_at)    m.push(['Posted', formatPosted(j.posted_at)]);
     if (j.source)       m.push(['Source', j.source]);
@@ -80,8 +80,8 @@ document.addEventListener('DOMContentLoaded', async  => {
     if (j.track)        m.push(['Track',  j.track]);
     if (j.status)       m.push(['Status', j.status]);
     if (j.salary_min || j.salary_max) {
-      const lo = j.salary_min ? '$' + Number(j.salary_min).toLocaleString : '?';
-      const hi = j.salary_max ? '$' + Number(j.salary_max).toLocaleString : '?';
+      const lo = j.salary_min ? '$' + Number(j.salary_min).toLocaleString() : '?';
+      const hi = j.salary_max ? '$' + Number(j.salary_max).toLocaleString() : '?';
       m.push(['Salary', lo + ' – ' + hi]);
     }
     if (Number.isFinite(j.semantic_score)) m.push(['Semantic', j.semantic_score]);
@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', async  => {
     scoreEl.setAttribute('tabindex', '0');
     scoreEl.style.cursor = 'pointer';
     scoreEl.title = 'Tap for score breakdown';
-    scoreEl.onclick =  => openBreakdownModalFor(j);
+    scoreEl.onclick = () => openBreakdownModalFor(j);
 
     // ---- Description ----
     if (j.description) {
@@ -141,10 +141,10 @@ document.addEventListener('DOMContentLoaded', async  => {
   // Render the tag-chip strip below the meta panel using R1 fields.
   function renderTags(j) {
     if (!tagsEl) return;
-    const bits = ;
+    const bits = [];
     const facetLabel = (facet, value) => {
       if (!taxonomy) return value;
-      const opts = taxonomy[facet] || ;
+      const opts = taxonomy[facet] || [];
       const hit = opts.find(o => o.value === value);
       return hit ? hit.label : value;
     };
@@ -239,9 +239,9 @@ document.addEventListener('DOMContentLoaded', async  => {
       <button class="action-skip   danger"  ${status === 'archived' ? 'disabled' : ''}>${status === 'archived' ? 'Skipped' : 'Skip'  }</button>
       <button class="action-applied applied" ${status === 'applied' ? 'disabled' : ''}>${status === 'applied' ? 'Applied' : 'Applied'}</button>
     `;
-    actionRow.querySelector('.action-save'   ).addEventListener('click',  => doAction('save'));
-    actionRow.querySelector('.action-skip'   ).addEventListener('click',  => doAction('skip'));
-    actionRow.querySelector('.action-applied').addEventListener('click',  => doAction('applied'));
+    actionRow.querySelector('.action-save'   ).addEventListener('click', () => doAction('save'));
+    actionRow.querySelector('.action-skip'   ).addEventListener('click', () => doAction('skip'));
+    actionRow.querySelector('.action-applied').addEventListener('click', () => doAction('applied'));
   }
 
   async function doAction(action) {
@@ -255,5 +255,5 @@ document.addEventListener('DOMContentLoaded', async  => {
     }
   }
 
-  load;
+  load();
 });

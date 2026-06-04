@@ -1,9 +1,9 @@
-"""Tests for src/scrapers/himalayas.py — parse only."""
+"""Tests for src/scrapers/himalayas.py — parse() only."""
 from scrapers.himalayas import HimalayasScraper
 
 
-def test_parse_primary_field_names:
-    s = HimalayasScraper
+def test_parse_primary_field_names():
+    s = HimalayasScraper()
     raw = s.parse({
         "guid": "abc-123",
         "title": "Head of Engineering",
@@ -26,9 +26,9 @@ def test_parse_primary_field_names:
     assert raw.remote is True
 
 
-def test_parse_fallback_field_names:
+def test_parse_fallback_field_names():
     """Himalayas has renamed fields a few times; fallbacks must work."""
-    s = HimalayasScraper
+    s = HimalayasScraper()
     raw = s.parse({
         "id": "xyz",
         "title": "VP Product",
@@ -42,8 +42,8 @@ def test_parse_fallback_field_names:
     assert raw.url == "https://himalayas.app/jobs/globex-vp"
 
 
-def test_parse_missing_essentials_skips:
-    s = HimalayasScraper
+def test_parse_missing_essentials_skips():
+    s = HimalayasScraper()
     assert s.parse({}) is None
     assert s.parse({"title": "No Company"}) is None
     assert s.parse({"title": "No URL", "companyName": "Acme"}) is None

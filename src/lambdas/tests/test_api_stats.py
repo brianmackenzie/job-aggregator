@@ -25,7 +25,7 @@ def _make_job(job_id, score=0, track="unscored", source=None, status="active"):
 
 # ----- _band ---------------------------------------------------------------
 
-def test_band_thresholds:
+def test_band_thresholds():
     assert _band(100) == "T1"
     assert _band(78)  == "T1"
     assert _band(77)  == "T2"
@@ -61,7 +61,7 @@ def test_stats_groups_correctly(aws):
     assert body["total_active"] == 4
     assert body["by_band"] == {"T1": 1, "T2": 1, "T3": 1, "below": 1}
     # Tracks sort by frequency desc — gaming (2) before exec (1) before other (1).
-    assert list(body["by_track"].keys)[0] == "gaming"
+    assert list(body["by_track"].keys())[0] == "gaming"
     assert body["by_track"]["gaming"] == 2
     assert body["by_source"]["greenhouse"] == 2
     assert body["by_source"]["remoteok"]   == 2

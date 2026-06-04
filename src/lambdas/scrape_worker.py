@@ -63,22 +63,22 @@ def handler(event, context):
         log.error(
             "scrape_worker_unknown_source",
             source=source,
-            known=list_scrapers,
+            known=list_scrapers(),
         )
         return {"ok": False, "error": f"unknown source {source!r}"}
 
     # One-shot-override plumbing (introduced for the Phase-9 historical seed).
     # Callers can pass `{"source": "apify_linkedin", "overrides": {...}}` to
     # tweak one run without touching config/sources.yaml. The scraper opts
-    # into overrides by reading `self.overrides` in its fetch method.
+    # into overrides by reading `self.overrides` in its fetch() method.
     # Scrapers that don't care for overrides simply ignore the attribute.
     overrides = (event or {}).get("overrides") or {}
-    scraper = scraper_cls
+    scraper = scraper_cls()
     if overrides:
         scraper.overrides = overrides
         log.info("scrape_worker_overrides_applied", source=source, overrides=overrides)
 
-    # scrape_run is self-contained — handles its own errors, writes
+    # scrape_run() is self-contained — handles its own errors, writes
     # the ScrapeRuns row, archives raw payloads. We just call it.
-    summary = scraper.scrape_run
+    summary = scraper.scrape_run()
     return {"ok": True, "summary": summary}

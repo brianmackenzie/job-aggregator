@@ -23,7 +23,7 @@ from typing import Optional
 import requests
 import yaml
 
-REPO_ROOT     = Path(__file__).resolve.parent.parent
+REPO_ROOT     = Path(__file__).resolve().parent.parent
 COMPANIES_YML = REPO_ROOT / "config" / "companies.yaml"
 
 # Share the canonical User-Agent from src/scrapers/user_agent.py so the
@@ -47,7 +47,7 @@ def _check_greenhouse(slug: str) -> tuple[str, Optional[int], str]:
     if r.status_code != 200:
         return ("ERROR", r.status_code, f"HTTP {r.status_code}")
     try:
-        n = len(r.json.get("jobs") or )
+        n = len(r.json().get("jobs") or [])
     except Exception:
         return ("ERROR", 200, "invalid JSON")
     return ("OK", 200, f"{n} postings") if n > 0 else ("EMPTY", 200, "0 postings")
@@ -69,7 +69,7 @@ def _check_lever(slug: str) -> tuple[str, Optional[int], str]:
     if r.status_code != 200:
         return ("ERROR", r.status_code, f"HTTP {r.status_code}")
     try:
-        data = r.json
+        data = r.json()
     except Exception:
         return ("ERROR", 200, "invalid JSON")
     if not isinstance(data, list):
@@ -88,14 +88,14 @@ def _check_ashby(slug: str) -> tuple[str, Optional[int], str]:
     if r.status_code != 200:
         return ("ERROR", r.status_code, f"HTTP {r.status_code}")
     try:
-        data = r.json
+        data = r.json()
     except Exception:
         return ("ERROR", 200, "invalid JSON")
     # Ashby returns {"jobPostings": [...]} on success; error responses
     # often still 200 with an error key. Treat missing jobPostings as EMPTY.
     postings = data.get("jobPostings")
     if postings is None:
-        return ("ERROR", 200, f"keys={list(data.keys)}")
+        return ("ERROR", 200, f"keys={list(data.keys())}")
     return ("OK", 200, f"{len(postings)} postings") if len(postings) > 0 else ("EMPTY", 200, "0 postings")
 
 
@@ -106,16 +106,16 @@ _CHECKERS = {
 }
 
 
-def main -> int:
+def main() -> int:
     with COMPANIES_YML.open(encoding="utf-8") as fh:
-        companies = yaml.safe_load(fh).get("companies", )
+        companies = yaml.safe_load(fh).get("companies", [])
 
     # Filter to only the three public-API ATSes.
     targets = [c for c in companies if c.get("ats") in _CHECKERS and c.get("ats_slug")]
     print(f"Verifying {len(targets)} ATS slugs "
           f"(Greenhouse + Lever + Ashby) at {RATE_LIMIT_SECS:.1f} rps\n")
 
-    results: list[dict] = 
+    results: list[dict] = []
     last_req = 0.0
     for c in targets:
         ats  = c["ats"]
@@ -123,11 +123,11 @@ def main -> int:
         name = c["name"]
 
         # Simple fixed-interval throttle — matches the scrapers' behavior.
-        delay = RATE_LIMIT_SECS - (time.time - last_req)
+        delay = RATE_LIMIT_SECS - (time.time() - last_req)
         if delay > 0:
             time.sleep(delay)
         status, code, note = _CHECKERS[ats](slug)
-        last_req = time.time
+        last_req = time.time()
 
         results.append({
             "name":   name,
@@ -145,15 +145,15 @@ def main -> int:
     # ---------- summary ----------
     buckets: dict[str, list[dict]] = {}
     for r in results:
-        buckets.setdefault(r["status"], ).append(r)
+        buckets.setdefault(r["status"], []).append(r)
 
     print("\n" + "=" * 70)
     print("Summary:")
     for status in ("OK", "EMPTY", "NOT_FOUND", "ERROR"):
-        rows = buckets.get(status, )
+        rows = buckets.get(status, [])
         print(f"  {status:10s} {len(rows):3d}")
 
-    bad = buckets.get("NOT_FOUND", ) + buckets.get("ERROR", )
+    bad = buckets.get("NOT_FOUND", []) + buckets.get("ERROR", [])
     if bad:
         print("\nProblems to fix in config/companies.yaml:")
         for r in bad:
@@ -164,4 +164,4 @@ def main -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main)
+    sys.exit(main())

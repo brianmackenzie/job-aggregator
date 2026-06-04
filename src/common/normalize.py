@@ -40,7 +40,7 @@ def normalize_company(name: Optional[str]) -> str:
         "Example Corporation"      -> "example"
         "Example, Inc."            -> "example"
         "L'Oréal SA"              -> "l'oreal"
-        "  Epic   Games  "        -> "epic games"
+        "  a game studio  "        -> "a game studio"
         "Example Studio (ES)" -> "example studio"
         "Foo (Bar) Inc."          -> "foo"
     """
@@ -49,7 +49,7 @@ def normalize_company(name: Optional[str]) -> str:
     # NFKD: "é" -> "e" + combining accent; "\u00A0" (NBSP) -> regular space.
     folded = unicodedata.normalize("NFKD", name)
     folded = "".join(c for c in folded if not unicodedata.combining(c))
-    cleaned = _WHITESPACE_RE.sub(" ", folded.lower).strip
+    cleaned = _WHITESPACE_RE.sub(" ", folded.lower()).strip()
     # Iterate so chained suffixes drop together. Example walk:
     #   "foo (bar) inc"   -> "foo (bar)"   (corp-suffix strip)
     #   "foo (bar)"       -> "foo"         (paren strip)
@@ -120,16 +120,16 @@ def canonicalize_posted_at(value: Optional[object]) -> Optional[str]:
       - unix epoch seconds (as int or a string of digits)
       - date-only strings like "2026-04-16" (assumed UTC midnight)
 
-    Returns None if parsing fails — callers should fall back to now
+    Returns None if parsing fails — callers should fall back to now()
     when the source doesn't publish a posted_at.
     """
     if value is None:
         return None
-    s = str(value).strip
+    s = str(value).strip()
     if not s:
         return None
     # Epoch seconds (pure digits).
-    if s.isdigit:
+    if s.isdigit():
         try:
             dt = datetime.fromtimestamp(int(s), tz=timezone.utc)
             return dt.strftime("%Y-%m-%dT%H:%M:%SZ")

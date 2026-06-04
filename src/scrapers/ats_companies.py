@@ -18,7 +18,7 @@ from typing import Optional
 
 import yaml
 
-_HERE = Path(__file__).resolve.parent   # .../src/scrapers/
+_HERE = Path(__file__).resolve().parent   # .../src/scrapers/
 
 # Candidate paths, tried in order.
 _CANDIDATES = [
@@ -39,17 +39,17 @@ def load_ats_companies(ats_type: str) -> list[dict]:
     """
     global _cached
     if _cached is None:
-        _cached = _parse_yaml
+        _cached = _parse_yaml()
     return [c for c in _cached if c.get("ats") == ats_type]
 
 
-def _parse_yaml -> list[dict]:
+def _parse_yaml() -> list[dict]:
     """Find and parse companies.yaml. Raises RuntimeError if not found."""
     for path in _CANDIDATES:
-        if path.exists:
+        if path.exists():
             with open(path, encoding="utf-8") as fh:
                 data = yaml.safe_load(fh)
-            return data.get("companies", )
+            return data.get("companies", [])
     raise RuntimeError(
         "companies.yaml not found. Searched:\n"
         + "\n".join(f"  {p}" for p in _CANDIDATES)

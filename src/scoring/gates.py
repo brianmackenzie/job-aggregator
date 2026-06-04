@@ -1,4 +1,4 @@
-"""
+# ===================================================================
 # PERSONAL PROFILE DATA — REPLACE BEFORE USING AT SCALE
 #
 # This module contains constants that encode the ORIGINAL AUTHOR'S
@@ -14,7 +14,7 @@
 #      your own geography, industry keywords, and company lists.
 #
 # See `docs/FORKING.md` for a file-by-file guide.
-"""
+# ===================================================================
 
 """Hard gates and the geographic soft-gate multiplier.
 
@@ -44,7 +44,7 @@ from .keywords import (
     KW_ENG_DISQ,
     KW_SENIORITY_DISQ,
     LOC_HEAVY_OFFICE_RE,
-    LOC_NJ_RE,
+    LOC_LOCAL_RE,
     LOC_NYC_RE,
     LOC_OUT_OF_AREA_RE,
     LOC_RELOCATION_RE,
@@ -611,7 +611,7 @@ _FUNCTION_GATE_KWS: list[str] = [
     "recruiter,",              # "Recruiter, X" — IC recruiter
     "senior recruiter",
     "people partner",
-    "people business partner",     # Roblox/Google term for HRBP
+    "people business partner",     # a large platform company/Google term for HRBP
     "compensation business partner",
     "benefits business partner",
     "business partner",            # catches all "X Business Partner" HR/Finance roles
@@ -623,7 +623,7 @@ _FUNCTION_GATE_KWS: list[str] = [
     "employee experience",
     # Executive assistant / admin support — wrong function
     "executive assistant",
-    "executive business partner",   # Google/Roblox term for senior EA
+    "executive business partner",   # Google/a large platform company term for senior EA
     "administrative assistant",
     "office of the ceo",            # often EA / chief-of-staff-light role
     "office manager",
@@ -786,10 +786,10 @@ _FUNCTION_GATE_KWS: list[str] = [
     # Bare scrum / project IC titles (the "project manager," form was already
     # gated; these catch the bare title without comma).
     "product owner",
-    # ---- FanDuel-pattern HR/comp/inclusion/analytics ----
-    # The FanDuel CRM/Greenhouse scrape was producing 19/20 of the top-20
-    # results from FanDuel — heavily weighted toward Marketing Sciences,
-    # Compensation, DEI, Commercial Analytics, Casino Analytics. None of
+    # ---- a wagering platform-pattern HR/comp/inclusion/analytics ----
+    # The a wagering platform CRM/Greenhouse scrape was producing 19/20 of the top-20
+    # results from a wagering platform — heavily weighted toward Marketing Sciences,
+    # Compensation, DEI, Commercial Analytics, wagering Analytics. None of
     # these are the original author's lane. Adding gate kws by category.
     #
     # Compensation leadership / IC (the original author is NOT a comp exec)
@@ -824,13 +824,13 @@ _FUNCTION_GATE_KWS: list[str] = [
     # People leadership — comma forms missed by "vp of people"
     "vp, people",
     "vp people",
-    # Commercial Analyst (FanDuel "Commercial Senior Analyst" pattern)
+    # Commercial Analyst (a wagering platform "Commercial Senior Analyst" pattern)
     "commercial analyst",
     "commercial senior analyst",
     "senior commercial analyst",
     "commercial operations analyst",
     # Analytics leadership — the original author is tech/strategy, not analytics-track exec
-    # Catches FanDuel "Analytics Senior Director, Casino" pattern
+    # Catches a wagering platform "Analytics Senior Director, wagering" pattern
     "head of analytics",
     "vp of analytics",
     "vp, analytics",
@@ -843,18 +843,18 @@ _FUNCTION_GATE_KWS: list[str] = [
     "senior director of analytics",
     "analytics manager",
     "senior analytics manager",
-    # Casino-specific operator titles (FanDuel/iGaming) — sub-VP casino ops,
+    # wagering-specific operator titles (a wagering platform/online wagering) — sub-VP wagering ops,
     # not the original author's lane.
-    "casino analyst",
-    "casino manager",
-    "casino operations",
-    # ---- b: post-rescore audit caught more FanDuel-shape patterns ----
+    "wagering analyst",
+    "wagering manager",
+    "wagering operations",
+    # ---- b: post-rescore audit caught more a wagering platform-shape patterns ----
     # The first batch used VP-first word order (e.g. "vp marketing").
-    # FanDuel + many other big-co JDs use FUNCTION-first word order:
+    # a wagering platform + many other big-co JDs use FUNCTION-first word order:
     # "Marketing Sciences Vice President", "Algorithmic Trading Senior Manager".
     # The patterns below catch the function-suffix forms.
     #
-    # Marketing Sciences / Marketing Tech (FanDuel-canonical noise)
+    # Marketing Sciences / Marketing Tech (a wagering platform-canonical noise)
     "marketing sciences",
     "marketing science",
     "marketing technology",
@@ -872,7 +872,7 @@ _FUNCTION_GATE_KWS: list[str] = [
     "finance vice president",
     "compensation vice president",
     "people vice president",
-    # Insights / Research IC + sub-VP (FanDuel-canonical Consumer Insights)
+    # Insights / Research IC + sub-VP (a wagering platform-canonical Consumer Insights)
     "consumer insights",
     "customer insights",
     "insights analyst",
@@ -887,7 +887,7 @@ _FUNCTION_GATE_KWS: list[str] = [
     "trading analyst",
     "trading senior",              # "Algorithmic Trading Senior Manager"
     "algorithmic trading",
-    # IC events / VIP / hospitality (FanDuel-canonical noise)
+    # IC events / VIP / hospitality (a wagering platform-canonical noise)
     "vip host",
     "vip events",
     "vip associate",
@@ -896,19 +896,19 @@ _FUNCTION_GATE_KWS: list[str] = [
     "events specialist",           # already had — keeping
     "events coordinator",
     "events manager",              # already had — keeping
-    # CRM operations IC (FanDuel-shape — different from CRM marketing)
+    # CRM operations IC (a wagering platform-shape — different from CRM marketing)
     "crm operations",
     "crm associate",
     "crm analyst",
     # Operational Excellence — Six Sigma / IC ops mgr, not COO
     "operational excellence",
     # Commercial Strategy at sub-VP (catches "Commercial Strategy Manager,
-    # Pokerstars" — IC strategy ops, not the original author's strategy lane).
+    # a wagering brand" — IC strategy ops, not the original author's strategy lane).
     "commercial strategy manager",
     "commercial strategy associate",
     "commercial strategy analyst",
     "commercial strategy senior",
-    # Responsible Gaming / iGaming compliance/operator IC — these are
+    # Responsible Gaming / online wagering compliance/operator IC — these are
     # sportsbook-specific compliance/ops roles, not the original author's lane.
     "responsible gaming",
     "responsible gambling",
@@ -928,22 +928,22 @@ _FUNCTION_GATE_KWS: list[str] = [
     # IC PM with hyphen forms (existing gate matched "X PM, Y" but not
     # "X PM - Y"). Catches "Data Product Manager - Machine Learning".
     "data product manager",
-    # Performance & Insights — D2C-shape FanDuel exec
+    # Performance & Insights — D2C-shape a wagering platform exec
     "performance & insights",
     "performance and insights",
     # Trading IC (sportsbook trading desk — IC ops, not the original author's lane)
     "trading manager",
     "trading senior manager",
     "trading associate",
-    # Pokerstars-specific operator IC (FanDuel acquired Pokerstars)
-    "pokerstars",                  # If "Pokerstars" appears in title it's
-                                   # FanDuel iGaming product ops. NOT a hard
+    # a wagering brand-specific operator IC (a wagering platform acquired a wagering brand)
+    "a wagering brand",                  # If "a wagering brand" appears in title it's
+                                   # a wagering platform online wagering product ops. NOT a hard
                                    # gate by itself — but "Commercial Strategy
-                                   # Manager, Pokerstars" is exactly the
-                                   # FanDuel sub-VP shape. Risky? the original author could
-                                   # legit target VP Product Pokerstars. Keep
+                                   # Manager, a wagering brand" is exactly the
+                                   # a wagering platform sub-VP shape. Risky? the original author could
+                                   # legit target VP Product a wagering brand. Keep
                                    # this only if no false positives in audit.
-    # Sub-VP creator/community IC (catches Roblox/etc Creator Ops sub-VP)
+    # Sub-VP creator/community IC (catches a large platform company/etc Creator Ops sub-VP)
     "creator operations",
     "community operations",
     # ---- additions -------------------------
@@ -1093,16 +1093,16 @@ _FUNCTION_GATE_KWS: list[str] = [
     # gate; left unfiltered (will simply rely on the industry/company score
     # producing a low total).
     # ---- c: post-rescore audit (final tightening pass) -------------
-    # FanDuel's job board has 200+ postings; many score 70+ from
+    # a wagering platform's job board has 200+ postings; many score 70+ from
     # industry/company modifiers even when title is sub-VP IC. Patterns
-    # below catch FanDuel-shape noise without breaking real the original author targets.
+    # below catch a wagering platform-shape noise without breaking real the original author targets.
     #
     # Change management IC + sub-VP
     "change manager",
     "change lead",
     "change management",
     "change analyst",
-    # Customer Marketing / Customer Engagement (D2C-shape FanDuel noise).
+    # Customer Marketing / Customer Engagement (D2C-shape a wagering platform noise).
     "customer marketing",
     "customer engagement",
     "customer experience manager",
@@ -1128,7 +1128,7 @@ _FUNCTION_GATE_KWS: list[str] = [
     # adds the manager / IC forms below it.
     "finance manager",
     "senior finance manager",
-    # Release / Technical Release IC (FanDuel "Technical Release Specialist")
+    # Release / Technical Release IC (a wagering platform "Technical Release Specialist")
     "release specialist",
     "release manager",
     "release engineer",
@@ -1156,11 +1156,11 @@ _FUNCTION_GATE_KWS: list[str] = [
     "payments associate",
     "payments operations",
     # Discovery & Engagement / Performance & Insights — D2C-shape sub-VP
-    # at FanDuel (the "performance & insights" was added in 8b).
+    # at a wagering platform (the "performance & insights" was added in 8b).
     "discovery & engagement",
     "discovery and engagement",
     # AI / ML Architect IC — senior-IC technical roles, not the original author's exec
-    # lane. "Principal AI Architect" at FanDuel is IC, NOT Chief AI Officer.
+    # lane. "Principal AI Architect" at a wagering platform is IC, NOT Chief AI Officer.
     "ai architect",
     "ml architect",
     "principal ai",
@@ -1172,10 +1172,10 @@ _FUNCTION_GATE_KWS: list[str] = [
     "inclusion analyst",
     # ---- d: final mid-band cleanup pass -----------------------------
     # After c the top-12 is mostly real the original author-fit. These patterns
-    # catch the remaining 13-30 mid-band FanDuel/Take-Two noise.
+    # catch the remaining 13-30 mid-band a wagering platform/a prior employer noise.
     "operations excellence",       # "Operations Excellence Senior Analyst"
     "media associate",
-    "media manager",               # IC media (FanDuel; not "head of media")
+    "media manager",               # IC media (a wagering platform; not "head of media")
     "media specialist",
     "media coordinator",
     "media planner",               # already had — keeping
@@ -1185,9 +1185,9 @@ _FUNCTION_GATE_KWS: list[str] = [
     "vip specialist",
     "vip coordinator",
     "procurement operations",      # "Associate, Procurement Operations"
-    "senior associate, commercial",  # FanDuel "Senior Associate, Commercial Strategy"
+    "senior associate, commercial",  # a wagering platform "Senior Associate, Commercial Strategy"
     "associate, commercial",
-    "acquisition strategy",        # FanDuel D2C acquisition
+    "acquisition strategy",        # a wagering platform D2C acquisition
     "workplace manager",           # "Senior Workplace Manager"
     "senior workplace manager",
     "global compensation",         # "Senior Manager, Global Compensation"
@@ -1199,18 +1199,18 @@ _FUNCTION_GATE_KWS: list[str] = [
     "brand specialist",
     "brand coordinator",
     # ---- e: post-rescore final outliers --------------------------------
-    # Bare 'Analyst' as a full title (FanDuel posted a role literally titled
+    # Bare 'Analyst' as a full title (a wagering platform posted a role literally titled
     # "Analyst" that scored 83 from company/industry modifiers). Substring-safe:
     # "analyst" is NOT inside "analytics", and exec analytics titles already
     # gated separately in a (Director of Analytics, etc).
     "analyst",
-    # FanDuel D2C "Customer Growth Associate"
+    # a wagering platform D2C "Customer Growth Associate"
     "growth associate",
     # Rockstar "Strategy Operations Associate" — IC associate at sub-VP
     "operations associate",
-    # Roblox "Ops Specialist - Temporary"
+    # a large platform company "Ops Specialist - Temporary"
     "ops specialist",
-    # Take-Two "Legal Assistant / Business Affairs Specialist" — legal IC
+    # a prior employer "Legal Assistant / Business Affairs Specialist" — legal IC
     "business affairs",
     "legal assistant",
 ]
@@ -1291,7 +1291,7 @@ _FUNCTION_GATE_EXCEPTIONS: list[str] = [
     "executive producer",       # senior production leadership
     "showrunner",
     # General counsel is in-house legal exec — sometimes overlaps with M&A
-    # the original author did during Take-Two / Zynga. Keep narrowly.
+    # the original author did during prior employers. Keep narrowly.
     "general counsel",
     # NOTE: Intentionally REMOVED from exceptions (these are wrong-function for the original author,
     # even at exec level): CMO / VP Marketing / Head of Marketing, CHRO / VP People /
@@ -1422,7 +1422,7 @@ def check_function(title: str) -> tuple[bool, str]:
 
     Returns (fired: bool, name: "function").
     """
-    lo = title.lower
+    lo = title.lower()
 
     # 1. Priority gate — fires BEFORE exceptions. Use for phrases that must
     #    always gate even when the title includes a the original author-target leadership
@@ -1486,7 +1486,7 @@ def check_seniority(title: str) -> tuple[bool, str]:
 
     Returns (fired: bool, name: "seniority").
     """
-    lo_title = title.lower.strip
+    lo_title = title.lower().strip()
     # Standard YAML-driven kw check (intern / entry-level / junior / etc.)
     for kw in KW_SENIORITY_DISQ:
         if kw in lo_title:
@@ -1602,7 +1602,7 @@ def geographic_gate_and_score(
       geo_score:  0-10 category score fed into the weighted sum
       geo_label:  human-readable description of what was detected
     """
-    location: str  = (job.get("location") or "").lower
+    location: str  = (job.get("location") or "").lower()
     remote:   bool = job.get("remote", False)
     desc:     str  = job.get("description", "") or ""
     title:    str  = job.get("title", "") or ""
@@ -1626,7 +1626,7 @@ def geographic_gate_and_score(
         "singapore", "tokyo", "japan", "australia", "sydney",
         "germany", "berlin", "amsterdam", "paris", " uk,", " london,",
     ]
-    title_lo = title.lower
+    title_lo = title.lower()
     if any(kw in title_lo for kw in _INTL_TITLE_KWS):
         if not (remote or regex_match(full_text, LOC_REMOTE_RE)):
             return 0.0, LOC_SCORES.get("international", 2), "international_title"
@@ -1636,14 +1636,14 @@ def geographic_gate_and_score(
         return 1.0, LOC_SCORES.get("remote_us", 10), "remote_us"
 
     # --- 3. NJ-based office → very commutable from Anytown ---
-    if regex_match(full_text, LOC_NJ_RE):
-        return 1.0, LOC_SCORES.get("nj_office", 9), "nj_office"
+    if regex_match(full_text, LOC_LOCAL_RE):
+        return 1.0, LOC_SCORES.get("local_metro", 9), "local_metro"
 
     # --- 4. NYC hybrid or NYC in-office ---
     if regex_match(full_text, LOC_NYC_RE):
         # Distinguish heavy in-office (4-5 days) from hybrid.
         if regex_match(full_text, LOC_HEAVY_OFFICE_RE):
-            return 1.0, LOC_SCORES.get("nyc_heavy", 6), "nyc_heavy_office"
+            return 1.0, LOC_SCORES.get("regional_heavy", 6), "regional_heavy_office"
         return 1.0, LOC_SCORES.get("nyc_hybrid_3d", 8), "nyc_hybrid"
 
     # --- 5. Out-of-area city with required presence → hard gate (0) ---
@@ -1675,7 +1675,7 @@ def evaluate_all_gates(job: dict, text: str) -> tuple[list, float, float, float]
       engagement_gate_value: 0.0 or 1.0 (formula multiplier)
       geo_score:             0-10 geographic category score
     """
-    hard_gates: list[str] = 
+    hard_gates: list[str] = []
 
     # Seniority (checked on title only).
     seniority_fired, seniority_name = check_seniority(job.get("title", ""))

@@ -31,7 +31,7 @@ import yaml
 # invocations in the same container reuse the parsed YAML.
 # ---------------------------------------------------------------------------
 
-def _find_config -> Path:
+def _find_config() -> Path:
     """Locate scoring.yaml across dev + Lambda layouts.
 
     Candidate order (first match wins):
@@ -40,7 +40,7 @@ def _find_config -> Path:
       3. <src-root>/config/...      — Legacy src/config/ fallback (pre-A2)
       4. /var/task/config/...       — Legacy runtime fallback (pre-A2)
     """
-    here = Path(__file__).resolve.parent
+    here = Path(__file__).resolve().parent
     candidates = [
         Path("/opt/scoring.yaml"),                         # Lambda layer (prod)
         here.parent.parent / "config" / "scoring.yaml",    # repo root (dev)
@@ -48,20 +48,20 @@ def _find_config -> Path:
         Path("/var/task/config/scoring.yaml"),             # legacy Lambda runtime
     ]
     for p in candidates:
-        if p.exists:
+        if p.exists():
             return p
     raise FileNotFoundError(
         "scoring.yaml not found — checked: " + ", ".join(str(c) for c in candidates)
     )
 
 
-def _load_cfg -> dict:
-    with open(_find_config, "r", encoding="utf-8") as fh:
+def _load_cfg() -> dict:
+    with open(_find_config(), "r", encoding="utf-8") as fh:
         return yaml.safe_load(fh)
 
 
 # Module-level singleton — loaded once per Lambda cold start.
-CFG: dict = _load_cfg
+CFG: dict = _load_cfg()
 
 # ------------------------------------------------------------------
 # Convenience accessors
@@ -75,7 +75,7 @@ _KW = CFG["keywords"]
 
 def _kw(name: str) -> list:
     """Return a lowercase list from the keywords section."""
-    return [k.lower for k in _KW.get(name, )]
+    return [k.lower() for k in _KW.get(name, [])]
 
 
 KW_STRATEGY        = _kw("strategy")
@@ -86,17 +86,17 @@ KW_D2C_PAYMENTS    = _kw("d2c_payments")
 KW_HANDS_ON_CODE   = _kw("hands_on_coding")
 KW_SENIORITY_DISQ  = _kw("seniority_disqualifiers")
 KW_HELPING_PEOPLE  = _kw("helping_people")
-KW_GAMING_CULTURE  = _kw("gaming_culture")
-KW_MUSIC           = _kw("music_connection")
-KW_IMMERSIVE       = _kw("immersive_experiential")
-KW_CCG             = _kw("ccg_boardgame")
+KW_DOMAIN_CULTURE  = _kw("domain_culture")
+KW_CREATOR           = _kw("creator_signals")
+KW_EXPERIENTIAL       = _kw("experiential_signals")
+KW_MARKETPLACE_SIG             = _kw("marketplace_signals")
 KW_FAMILY_FRIENDLY = _kw("family_friendly")
 KW_CRUNCH_PACE     = _kw("crunch_pace")
 KW_CULTURE_REDFLAGS = _kw("culture_red_flags")
 KW_LGBTQ           = _kw("lgbtq_signals")
 KW_INTERIM         = _kw("interim_fractional")
 KW_ENG_DISQ        = _kw("engagement_disqualifiers")
-KW_NJ_OFFICE       = _kw("nj_office")
+KW_LOCAL_METRO       = _kw("local_metro")
 
 # Industry classification
 INDUSTRY_SCORES: dict = CFG["industry_buckets"]                     # bucket -> score
@@ -105,9 +105,9 @@ INDUSTRY_KW: dict     = CFG.get("industry_keywords", {})            # bucket -> 
 
 # Static company sets — normalized (lowercase, suffix-stripped).
 _STATIC = CFG.get("static_lists", {})
-HRC100:         frozenset = frozenset(_STATIC.get("hrc100_companies", ))
-CRUNCH_COS:     frozenset = frozenset(_STATIC.get("crunch_companies", ))
-CRUNCH_REDUCED: frozenset = frozenset(_STATIC.get("crunch_reduced_penalty_companies", ))
+HRC100:         frozenset = frozenset(_STATIC.get("hrc100_companies", []))
+CRUNCH_COS:     frozenset = frozenset(_STATIC.get("crunch_companies", []))
+CRUNCH_REDUCED: frozenset = frozenset(_STATIC.get("crunch_reduced_penalty_companies", []))
 
 # Tier thresholds
 TIER_CFG: dict  = CFG.get("tiers", {})
@@ -121,12 +121,12 @@ LOC_SCORES: dict = _LOC.get("scores", {})
 def _compile(patterns: list) -> list:
     return [re.compile(p) for p in patterns]
 
-LOC_REMOTE_RE:       list = _compile(_LOC.get("remote_patterns", ))
-LOC_NYC_RE:          list = _compile(_LOC.get("nyc_patterns", ))
-LOC_NJ_RE:           list = _compile(_LOC.get("nj_patterns", ))
-LOC_RELOCATION_RE:   list = _compile(_LOC.get("relocation_patterns", ))
-LOC_OUT_OF_AREA_RE:  list = _compile(_LOC.get("out_of_area_patterns", ))
-LOC_HEAVY_OFFICE_RE: list = _compile(_LOC.get("in_office_heavy_patterns", ))
+LOC_REMOTE_RE:       list = _compile(_LOC.get("remote_patterns", []))
+LOC_NYC_RE:          list = _compile(_LOC.get("nyc_patterns", []))
+LOC_LOCAL_RE:           list = _compile(_LOC.get("nj_patterns", []))
+LOC_RELOCATION_RE:   list = _compile(_LOC.get("relocation_patterns", []))
+LOC_OUT_OF_AREA_RE:  list = _compile(_LOC.get("out_of_area_patterns", []))
+LOC_HEAVY_OFFICE_RE: list = _compile(_LOC.get("in_office_heavy_patterns", []))
 
 # Modifier config
 MODIFIERS_CFG: dict = CFG.get("modifiers", {})
@@ -145,13 +145,13 @@ def keyword_hits(text: str, kw_list: list) -> int:
     The text is lowercased once and we do substring search — fast enough
     for job description lengths (<10 KB typical).
     """
-    lo = text.lower
+    lo = text.lower()
     return sum(1 for kw in kw_list if kw in lo)
 
 
 def any_match(text: str, kw_list: list) -> bool:
     """True if any keyword from kw_list appears anywhere in text."""
-    lo = text.lower
+    lo = text.lower()
     return any(kw in lo for kw in kw_list)
 
 
@@ -171,7 +171,7 @@ def build_text(job: dict) -> str:
         job.get("description", ""),
         job.get("location", ""),
     ]
-    return " ".join(p for p in parts if p).lower
+    return " ".join(p for p in parts if p).lower()
 
 
 def detect_industry(company_normalized: str, text: str) -> str:
@@ -183,11 +183,11 @@ def detect_industry(company_normalized: str, text: str) -> str:
       3. "general_enterprise_tech" as catch-all.
     """
     # 1. Company map lookup.
-    bucket = INDUSTRY_MAP.get(company_normalized.lower.strip)
+    bucket = INDUSTRY_MAP.get(company_normalized.lower().strip())
     if bucket:
         return bucket
     # 2. Keyword fallback — first bucket whose keywords appear in text wins.
-    for bucket_name, kws in INDUSTRY_KW.items:
+    for bucket_name, kws in INDUSTRY_KW.items():
         if any(kw in text for kw in kws):
             return bucket_name
     # 3. Fallback.
@@ -223,7 +223,7 @@ def detect_track(text: str, industry: str) -> str:
     if any_match(text, KW_INTERIM):
         return "TRACK_2_INTERIM"
     # Passion/pivot track — triggered by industry.
-    pivot_industries = TRACK_CFG.get("TRACK_3_PIVOT", {}).get("industries", )
+    pivot_industries = TRACK_CFG.get("TRACK_3_PIVOT", {}).get("industries", [])
     if industry in pivot_industries:
         return "TRACK_3_PIVOT"
     return "TRACK_1_FULLTIME"

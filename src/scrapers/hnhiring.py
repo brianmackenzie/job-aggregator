@@ -7,7 +7,7 @@ Strategy:
   3. Each top-level comment is one job posting. Heuristically extract a
      title + company from the first line of the comment text.
 
-The format is gloriously free-form, so parse is best-effort. The base
+The format is gloriously free-form, so parse() is best-effort. The base
 class's per-item try/except ensures bad comments don't tank the run; we
 return None to skip rather than fabricate garbage.
 
@@ -158,12 +158,12 @@ def _strip_html(s: str) -> str:
         return ""
     text = _TAG_RE.sub(" ", s)
     text = html.unescape(text)
-    return _WHITESPACE_RE.sub(" ", text).strip
+    return _WHITESPACE_RE.sub(" ", text).strip()
 
 
 def _looks_like_url(seg: str) -> bool:
     """A pipe segment that's literally a URL — never a title."""
-    return bool(_URL_RE.match(seg.strip))
+    return bool(_URL_RE.match(seg.strip()))
 
 
 def _contains_url(seg: str) -> bool:
@@ -178,7 +178,7 @@ def _contains_url(seg: str) -> bool:
 def _looks_like_location(seg: str) -> bool:
     """Heuristic: does this segment look like a location or remote-tag,
     rather than a job title?"""
-    s = seg.strip.lower
+    s = seg.strip().lower()
     if not s:
         return True
     # "Atlanta, GA" / "Mountain View, CA" — comma + 2-letter uppercase
@@ -197,7 +197,7 @@ def _looks_like_title(seg: str) -> bool:
     """First-pass title sniff: contains a role keyword AND isn't an
     obvious URL/location/boilerplate. Generous on what counts as a role —
     HN posters get creative with titles."""
-    s = seg.strip.lower
+    s = seg.strip().lower()
     if not s or len(s) > 200:
         return False
     if _looks_like_url(seg):
@@ -229,7 +229,7 @@ def _looks_like_company(seg: str) -> bool:
     """Short, plausible company segment. Used to find a company when we
     decide parts[0] was a title. Rejects anything with a URL, anything
     that looks like a location or a title, and any absurd length."""
-    s = (seg or "").strip
+    s = (seg or "").strip()
     if not s:
         return False
     if len(s) > 80:
@@ -247,7 +247,7 @@ def _looks_like_company(seg: str) -> bool:
     # pass every heuristic above but are obviously not company names:
     # bare city names ("Chicago"), employment types ("Full-Time"),
     # visa tags ("Visa Sponsorship"). See _NOT_A_COMPANY_EXACT docstring.
-    if s.lower in _NOT_A_COMPANY_EXACT:
+    if s.lower() in _NOT_A_COMPANY_EXACT:
         return False
     return True
 
@@ -271,7 +271,7 @@ def _company_from_url(text: str) -> Optional[str]:
     m = _URL_HOST_RE.search(text or "")
     if not m:
         return None
-    host = m.group(1).lower
+    host = m.group(1).lower()
     # Strip common jobs-adjacent subdomains so "careers.acme.com" → "acme".
     # `job-boards.` is Greenhouse's path-hosted boards subdomain;
     # `jobs-` / `careers-` are occasional variants.
@@ -297,7 +297,7 @@ def _company_from_url(text: str) -> Optional[str]:
     # becomes a cleaner "Acme-corp" → "Acme-corp". Simplest: leave hyphens in
     # and just capitalize the first letter. Downstream scoring is substring-
     # based, so pretty capitalization is secondary.
-    return root[:1].upper + root[1:]
+    return root[:1].upper() + root[1:]
 
 
 # Host roots that represent a hiring platform, not an employer.
@@ -337,7 +337,7 @@ class HNHiringScraper(BaseScraper):
     def fetch(self) -> Iterable[dict]:
         # Find the latest "Ask HN: Who is hiring?" story by user
         # whoishiring (a dedicated bot account that posts monthly).
-        self._throttle
+        self._throttle()
         search = requests.get(
             self.SEARCH_URL,
             params={
@@ -347,29 +347,29 @@ class HNHiringScraper(BaseScraper):
             },
             timeout=30,
         )
-        search.raise_for_status
-        hits = search.json.get("hits", )
+        search.raise_for_status()
+        hits = search.json().get("hits", [])
         if not hits:
             return
 
         # whoishiring also posts "Freelancer? Seeking freelancer?" and
         # "Who wants to be hired?" threads — filter to just hiring.
-        hiring = [h for h in hits if "who is hiring" in (h.get("title") or "").lower]
+        hiring = [h for h in hits if "who is hiring" in (h.get("title") or "").lower()]
         if not hiring:
             return
         story_id = hiring[0]["objectID"]
 
-        self._throttle
+        self._throttle()
         items = requests.get(
             self.ITEM_URL_TEMPLATE.format(story_id=story_id),
             timeout=60,
         )
-        items.raise_for_status
-        story = items.json
+        items.raise_for_status()
+        story = items.json()
 
         # Top-level children are individual job postings. Skip nested
         # replies (those are conversation, not jobs).
-        for child in story.get("children") or :
+        for child in story.get("children") or []:
             if child.get("text"):
                 # Pass the parent story id along for the URL.
                 child["_story_id"] = story_id
@@ -387,7 +387,7 @@ class HNHiringScraper(BaseScraper):
         # module docstring).
         first_line, _, rest = text.partition(". ")
         head = first_line if "|" in first_line else text.split("\n", 1)[0]
-        parts = [p.strip for p in head.split("|") if p.strip]
+        parts = [p.strip() for p in head.split("|") if p.strip()]
 
         if not parts:
             return None
@@ -446,12 +446,12 @@ class HNHiringScraper(BaseScraper):
         # but better than nothing.
         location = next(
             (p for p in parts[2:] if any(
-                token in p.lower
+                token in p.lower()
                 for token in ("remote", "ny", "sf", "us", "uk", "eu", "europe", "onsite", "hybrid")
             )),
             None,
         )
-        is_remote = "remote" in head.lower
+        is_remote = "remote" in head.lower()
 
         # ---------- Salary ----------
         # Salary is embedded freeform in the head. Prefer the head over

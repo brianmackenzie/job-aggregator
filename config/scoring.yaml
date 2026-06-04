@@ -187,10 +187,13 @@ modifiers:
 # tiers — 0-100 score cutoffs for final tier label.
 # --------------------------------------------------------------------
 tiers:
-  T1:   78
-  T2:   65
-  T3:   50
-  T4:    0
+  # Each tier maps to a {min_score: N} object (the scorer reads
+  # tiers.<name>.min_score). A job's tier is the highest tier whose
+  # min_score it meets; below the lowest threshold it is "skip".
+  T1:        {min_score: 78}
+  T2:        {min_score: 65}
+  T3:        {min_score: 50}
+  watchlist: {min_score: 35}
 
 # --------------------------------------------------------------------
 # tracks — career-story buckets. The prefilter picks one track

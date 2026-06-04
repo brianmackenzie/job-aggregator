@@ -32,7 +32,7 @@ class RemoteOKScraper(BaseScraper):
 
     def fetch(self) -> Iterable[dict]:
         # Single GET — small JSON payload, no pagination.
-        self._throttle
+        self._throttle()
         resp = requests.get(
             self.API_URL,
             headers={
@@ -41,8 +41,8 @@ class RemoteOKScraper(BaseScraper):
             },
             timeout=30,
         )
-        resp.raise_for_status
-        data = resp.json
+        resp.raise_for_status()
+        data = resp.json()
         for entry in data:
             # Skip the legal-notice header (no `id`) and any non-dict noise.
             if isinstance(entry, dict) and entry.get("id"):

@@ -27,7 +27,7 @@ from boto3.dynamodb.conditions import Key
 _resource = None
 
 
-def _ddb:
+def _ddb():
     global _resource
     if _resource is None:
         _resource = boto3.resource("dynamodb")
@@ -36,13 +36,13 @@ def _ddb:
 
 def _table(env_var: str):
     name = os.environ[env_var]
-    return _ddb.Table(name)
+    return _ddb().Table(name)
 
 
-def jobs_table:          return _table("JOBS_TABLE")
-def companies_table:     return _table("COMPANIES_TABLE")
-def scrape_runs_table:   return _table("SCRAPE_RUNS_TABLE")
-def user_prefs_table:    return _table("USER_PREFS_TABLE")
+def jobs_table():          return _table("JOBS_TABLE")
+def companies_table():     return _table("COMPANIES_TABLE")
+def scrape_runs_table():   return _table("SCRAPE_RUNS_TABLE")
+def user_prefs_table():    return _table("USER_PREFS_TABLE")
 
 
 # ------------------------------------------------------------------
@@ -54,10 +54,10 @@ def _encode(value: Any) -> Any:
     """Recursively convert floats -> Decimal for DynamoDB.
     Leaves ints, strs, bools, None, etc. untouched."""
     if isinstance(value, float):
-        # str round-trips through Decimal without IEEE-754 surprises.
+        # str() round-trips through Decimal without IEEE-754 surprises.
         return Decimal(str(value))
     if isinstance(value, dict):
-        return {k: _encode(v) for k, v in value.items}
+        return {k: _encode(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [_encode(v) for v in value]
     return value
@@ -66,9 +66,9 @@ def _encode(value: Any) -> Any:
 def _decode(value: Any) -> Any:
     """Recursively convert DynamoDB Decimal -> int or float."""
     if isinstance(value, Decimal):
-        return int(value) if value == value.to_integral_value else float(value)
+        return int(value) if value == value.to_integral_value() else float(value)
     if isinstance(value, dict):
-        return {k: _decode(v) for k, v in value.items}
+        return {k: _decode(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [_decode(v) for v in value]
     if isinstance(value, set):
@@ -89,7 +89,7 @@ _PRESERVE_ON_UPSERT = ("status", "user_notes")
 def put_job(job: dict) -> bool:
     """Upsert a job row. Returns True if the row existed (updated),
     False if newly inserted. Preserves user-modified fields on update."""
-    table = jobs_table
+    table = jobs_table()
     existing = get_job(job["job_id"])
     if existing:
         for field_name in _PRESERVE_ON_UPSERT:
@@ -119,11 +119,11 @@ def update_job_action(
     raises ConditionalCheckFailedException, which we map to None (and no
     write happens — the condition prevents the implicit upsert). Same
     external contract, half the Dynamo calls, no race. This mirrors
-    bulk_update_action, which was already written this way.
+    bulk_update_action(), which was already written this way.
     """
     from botocore.exceptions import ClientError
 
-    table = jobs_table
+    table = jobs_table()
 
     update_expr = ["#s = :s"]
     values: dict[str, Any] = {":s": status}
@@ -151,7 +151,7 @@ def update_job_action(
 
 
 def get_job(job_id: str) -> Optional[dict]:
-    resp = jobs_table.get_item(Key={"job_id": job_id})
+    resp = jobs_table().get_item(Key={"job_id": job_id})
     item = resp.get("Item")
     return _decode(item) if item else None
 
@@ -181,8 +181,8 @@ def query_jobs_by_score(
     }
     if cursor:
         kwargs["ExclusiveStartKey"] = cursor
-    resp = jobs_table.query(**kwargs)
-    items = _decode(resp.get("Items", ))
+    resp = jobs_table().query(**kwargs)
+    items = _decode(resp.get("Items", []))
 
     # Hydrate work_mode for each row from the main table. Single round-trip
     # batch_get_item, up to 100 keys per call (we only ever have `limit`
@@ -214,7 +214,7 @@ def _hydrate_work_mode(items: list[dict]) -> None:
         if not keys:
             return
         table_name = os.environ["JOBS_TABLE"]
-        resp = _ddb.batch_get_item(
+        resp = _ddb().batch_get_item(
             RequestItems={
                 table_name: {
                     "Keys": keys,
@@ -222,7 +222,7 @@ def _hydrate_work_mode(items: list[dict]) -> None:
                 }
             }
         )
-        fetched = resp.get("Responses", {}).get(table_name, ) or 
+        fetched = resp.get("Responses", {}).get(table_name, []) or []
         # Index by job_id once, then merge both fields onto each item below.
         by_id = {r["job_id"]: r for r in fetched}
         for it in items:
@@ -261,13 +261,13 @@ _BROWSE_CACHE: dict = {}                # status -> (expires_at_epoch, items)
 # but a cache miss costs ~7s (full 10K-row scan + dedup + projection). the original author
 # is a single user — a 10-min staleness window is fine, and it slashes the
 # odds of a browser session ever paying the 7s penalty mid-browse. The
-# RescoreFn / ScrapeWorker handlers explicitly call invalidate_browse_cache
+# RescoreFn / ScrapeWorker handlers explicitly call invalidate_browse_cache()
 # after writes, so user-visible changes still propagate within seconds inside
 # the same Lambda container.
 _BROWSE_CACHE_TTL_SECONDS = 600
 
 
-def _projection_for_browse -> tuple[str, dict]:
+def _projection_for_browse() -> tuple[str, dict]:
     """Project only the fields the browse list view actually renders.
 
     Drops the heavy blobs we used to ship on every list page:
@@ -336,7 +336,7 @@ def _snippet_rationale(text: object) -> str:
     if cut < _RATIONALE_SNIPPET_CHARS // 2:
         # No good space break in the back half — just hard-cut.
         cut = _RATIONALE_SNIPPET_CHARS
-    return text[:cut].rstrip + "\u2026"   # … (single ellipsis char)
+    return text[:cut].rstrip() + "\u2026"   # … (single ellipsis char)
 
 
 # statuses we deliberately skip the warm cache for.
@@ -359,15 +359,15 @@ def _scan_active_items(status: str) -> list[dict]:
     the archived bucket is large but rarely visited, and the user
     explicitly requested we not cache it.
     """
-    now = _time.time
+    now = _time.time()
     use_cache = status not in _UNCACHED_STATUSES
     if use_cache:
         cached = _BROWSE_CACHE.get(status)
         if cached and cached[0] > now:
             return cached[1]
 
-    table = jobs_table
-    proj_expr, proj_names = _projection_for_browse
+    table = jobs_table()
+    proj_expr, proj_names = _projection_for_browse()
     # `status` is a DynamoDB reserved word so we alias it via #s — and
     # we already need the alias in the projection, so we reuse the
     # same ExpressionAttributeNames map to avoid a duplicate-key error.
@@ -378,13 +378,13 @@ def _scan_active_items(status: str) -> list[dict]:
         "ExpressionAttributeValues": {":s": status},
     }
 
-    items: list[dict] = 
+    items: list[dict] = []
     last = None
     while True:
         if last:
             scan_kwargs["ExclusiveStartKey"] = last
         resp = table.scan(**scan_kwargs)
-        items.extend(_decode(resp.get("Items", )))
+        items.extend(_decode(resp.get("Items", [])))
         last = resp.get("LastEvaluatedKey")
         if not last:
             break
@@ -395,7 +395,7 @@ def _scan_active_items(status: str) -> list[dict]:
 
 
 # bulk-action helper for the multi-select UI.
-# update_job_action does a single-row update with ReturnValues="ALL_NEW"
+# update_job_action() does a single-row update with ReturnValues="ALL_NEW"
 # (round-trip per row + full row return). When the original author taps "Archive
 # selected" on 30 cards, that's 30 sequential Dynamo updates + 30 cache
 # misses on the next /browse fetch.  This helper:
@@ -427,12 +427,12 @@ def bulk_update_action(
     would double the Dynamo cost and create a TOCTOU race).
     """
     if not job_ids:
-        return {"ok": , "missing": , "errors": }
+        return {"ok": [], "missing": [], "errors": []}
 
-    table = jobs_table
-    ok: list[str] = 
-    missing: list[str] = 
-    errors: list[dict] = 
+    table = jobs_table()
+    ok: list[str] = []
+    missing: list[str] = []
+    errors: list[dict] = []
 
     # Build update once; reuse for every row.
     update_expr_parts = ["#s = :s"]
@@ -474,7 +474,7 @@ def bulk_update_action(
     # ApiJobsFn handles the very next /browse request from the same
     # container in the warm-path scenario, so the user sees fresh data
     # on reload. The 600s TTL eventually catches stragglers.
-    invalidate_browse_cache
+    invalidate_browse_cache()
 
     return {"ok": ok, "missing": missing, "errors": errors}
 
@@ -486,7 +486,7 @@ def invalidate_browse_cache(status: Optional[str] = None) -> None:
     Used by rescore.py at the end of a full pass + by tests.
     """
     if status is None:
-        _BROWSE_CACHE.clear
+        _BROWSE_CACHE.clear()
     else:
         _BROWSE_CACHE.pop(status, None)
 
@@ -494,7 +494,7 @@ def invalidate_browse_cache(status: Optional[str] = None) -> None:
 def _with_rationale_snippet(job: dict) -> dict:
     """Return a shallow copy of `job` with `semantic_rationale` truncated.
 
-    Used by query_jobs_for_browse on the page slice so the wire payload
+    Used by query_jobs_for_browse() on the page slice so the wire payload
     stays small. We must not mutate the input — it lives in the warm
     cache and other callers (different offsets, different filters that
     happen to land the same row in their page) need the full text.
@@ -519,7 +519,7 @@ def _normalize_title(title: str) -> str:
     if the original author sees obvious near-duplicates surviving."""
     if not title:
         return ""
-    return " ".join(title.lower.split)
+    return " ".join(title.lower().split())
 
 
 def query_jobs_for_browse(
@@ -585,12 +585,12 @@ def query_jobs_for_browse(
     would need a GSI projection schema change, flagged disruptive in
     CLAUDE.md.
     """
-    q                = (q or "").strip.lower or None
-    industries       = [i.lower for i in (industries or ) if i]
-    role_types       = [r.lower for r in (role_types or ) if r]
-    company_groups   = [c.lower for c in (company_groups or ) if c]
-    work_modes       = [w.lower for w in (work_modes or ) if w]
-    engagement_types = [e.lower for e in (engagement_types or ) if e]
+    q                = (q or "").strip().lower() or None
+    industries       = [i.lower() for i in (industries or []) if i]
+    role_types       = [r.lower() for r in (role_types or []) if r]
+    company_groups   = [c.lower() for c in (company_groups or []) if c]
+    work_modes       = [w.lower() for w in (work_modes or []) if w]
+    engagement_types = [e.lower() for e in (engagement_types or []) if e]
 
     # Cached scan. Pulls all rows for `status` once per warm Lambda per 60s.
     items = _scan_active_items(status)
@@ -604,23 +604,23 @@ def query_jobs_for_browse(
                 str(j.get("title") or "") + " " +
                 str(j.get("company") or "") + " " +
                 str(j.get("location") or "")
-            ).lower
+            ).lower()
             if q not in hay:
                 return False
         if industries:
-            j_inds = {str(i).lower for i in (j.get("industries") or )}
+            j_inds = {str(i).lower() for i in (j.get("industries") or [])}
             if not (j_inds & set(industries)):
                 return False
         if role_types:
-            j_rts = {str(r).lower for r in (j.get("role_types") or )}
+            j_rts = {str(r).lower() for r in (j.get("role_types") or [])}
             if not (j_rts & set(role_types)):
                 return False
         if company_groups:
-            cg = str(j.get("company_group") or "").lower
+            cg = str(j.get("company_group") or "").lower()
             if cg not in set(company_groups):
                 return False
         if work_modes:
-            wm = str(j.get("work_mode") or "").lower
+            wm = str(j.get("work_mode") or "").lower()
             if wm not in set(work_modes):
                 return False
         if engagement_types:
@@ -628,7 +628,7 @@ def query_jobs_for_browse(
             # rows that haven't been rescored yet will be missing the
             # field entirely — treat those as "unclear" so the chip stays
             # honest rather than silently filtering them out.
-            et = str(j.get("engagement_type") or "unclear").lower
+            et = str(j.get("engagement_type") or "unclear").lower()
             if et not in set(engagement_types):
                 return False
         if min_score and (int(j.get("score") or 0) < min_score):
@@ -655,9 +655,9 @@ def query_jobs_for_browse(
     # have a stable key to dedup on).
     if dedup and matched:
         groups: dict[tuple[str, str], dict] = {}
-        passthrough: list[dict] = 
+        passthrough: list[dict] = []
         for j in matched:
-            cn = str(j.get("company_normalized") or "").strip.lower
+            cn = str(j.get("company_normalized") or "").strip().lower()
             tn = _normalize_title(str(j.get("title") or ""))
             if not cn or not tn:
                 passthrough.append(j)
@@ -669,7 +669,7 @@ def query_jobs_for_browse(
                 j_copy = dict(j)
                 j_copy["dupe_count"] = 1
                 src = j.get("source")
-                j_copy["dupe_sources"] = [src] if src else 
+                j_copy["dupe_sources"] = [src] if src else []
                 groups[key] = j_copy
                 continue
             # Merge: bump count, append source, swap winner if this row
@@ -688,10 +688,10 @@ def query_jobs_for_browse(
                 replacement["dupe_count"]   = carry_count
                 replacement["dupe_sources"] = carry_sources
                 groups[key] = replacement
-        matched = list(groups.values) + passthrough
+        matched = list(groups.values()) + passthrough
 
     # ---- Sorting ----
-    reverse = (sort_dir or "desc").lower != "asc"
+    reverse = (sort_dir or "desc").lower() != "asc"
 
     def _sort_key(j: dict):
         if sort_by == "qol":
@@ -738,7 +738,7 @@ def query_jobs_for_browse(
             reverse=True,
         )
         matched.sort(
-            key=lambda j: (j.get("company") or "").strip.lower,
+            key=lambda j: (j.get("company") or "").strip().lower(),
             reverse=(sort_by == "company_desc"),
         )
     else:
@@ -768,13 +768,13 @@ def query_jobs_for_browse(
 
 
 def query_jobs_by_company(company_normalized: str, limit: int = 100) -> list[dict]:
-    resp = jobs_table.query(
+    resp = jobs_table().query(
         IndexName="CompanyIndex",
         KeyConditionExpression=Key("company_normalized").eq(company_normalized),
         ScanIndexForward=False,
         Limit=limit,
     )
-    return _decode(resp.get("Items", ))
+    return _decode(resp.get("Items", []))
 
 
 def query_jobs_by_track(
@@ -790,8 +790,8 @@ def query_jobs_by_track(
     }
     if cursor:
         kwargs["ExclusiveStartKey"] = cursor
-    resp = jobs_table.query(**kwargs)
-    return _decode(resp.get("Items", )), resp.get("LastEvaluatedKey")
+    resp = jobs_table().query(**kwargs)
+    return _decode(resp.get("Items", [])), resp.get("LastEvaluatedKey")
 
 
 def iter_active_jobs(batch_size: int = 100) -> Iterable[dict]:
@@ -806,8 +806,8 @@ def iter_active_jobs(batch_size: int = 100) -> Iterable[dict]:
         }
         if last:
             kwargs["ExclusiveStartKey"] = last
-        resp = jobs_table.query(**kwargs)
-        for item in resp.get("Items", ):
+        resp = jobs_table().query(**kwargs)
+        for item in resp.get("Items", []):
             yield _decode(item)
         last = resp.get("LastEvaluatedKey")
         if not last:
@@ -819,17 +819,17 @@ def iter_active_jobs(batch_size: int = 100) -> Iterable[dict]:
 # ------------------------------------------------------------------
 
 def put_scrape_run(row: dict) -> None:
-    scrape_runs_table.put_item(Item=_encode(row))
+    scrape_runs_table().put_item(Item=_encode(row))
 
 
 def get_recent_scrape_runs(source_name: str, limit: int = 20) -> list[dict]:
     """Return the most recent scrape runs for one source."""
-    resp = scrape_runs_table.query(
+    resp = scrape_runs_table().query(
         KeyConditionExpression=Key("source_name").eq(source_name),
         ScanIndexForward=False,
         Limit=limit,
     )
-    return _decode(resp.get("Items", ))
+    return _decode(resp.get("Items", []))
 
 
 # ------------------------------------------------------------------
@@ -837,11 +837,11 @@ def get_recent_scrape_runs(source_name: str, limit: int = 20) -> list[dict]:
 # ------------------------------------------------------------------
 
 def upsert_company(row: dict) -> None:
-    companies_table.put_item(Item=_encode(row))
+    companies_table().put_item(Item=_encode(row))
 
 
 def get_company(name_normalized: str) -> Optional[dict]:
-    resp = companies_table.get_item(
+    resp = companies_table().get_item(
         Key={"company_name_normalized": name_normalized}
     )
     item = resp.get("Item")
@@ -849,11 +849,11 @@ def get_company(name_normalized: str) -> Optional[dict]:
 
 
 def list_companies_by_tier(tier: str) -> list[dict]:
-    resp = companies_table.query(
+    resp = companies_table().query(
         IndexName="TierIndex",
         KeyConditionExpression=Key("tier").eq(tier),
     )
-    return _decode(resp.get("Items", ))
+    return _decode(resp.get("Items", []))
 
 
 # ------------------------------------------------------------------
@@ -863,17 +863,17 @@ def list_companies_by_tier(tier: str) -> list[dict]:
 def get_prefs(user_id: str = "owner") -> dict:
     """Return a dict mapping config_key -> value for this user.
     Missing user returns an empty dict."""
-    resp = user_prefs_table.query(
+    resp = user_prefs_table().query(
         KeyConditionExpression=Key("user_id").eq(user_id),
     )
     out = {}
-    for item in _decode(resp.get("Items", )):
+    for item in _decode(resp.get("Items", [])):
         out[item["config_key"]] = item.get("value")
     return out
 
 
 def put_pref(user_id: str, config_key: str, value: Any) -> None:
-    user_prefs_table.put_item(Item=_encode({
+    user_prefs_table().put_item(Item=_encode({
         "user_id": user_id,
         "config_key": config_key,
         "value": value,

@@ -34,7 +34,7 @@ _WHITESPACE_RE = re.compile(r"\s+")
 def _clean(s: str) -> str:
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 def _text_of(soup: BeautifulSoup, *,
@@ -56,7 +56,7 @@ class BuiltInNYCScraper(BaseScraper):
     schedule = "cron(30 6 * * ? *)"
     rate_limit_rps = 0.5
     # 2026-06-03: detail-page descriptions (the listing/card omits the JD).
-    # scrape_run fetches RawJob.url + extracts JSON-LD first, then this
+    # scrape_run() fetches RawJob.url + extracts JSON-LD first, then this
     # CSS selector; populates QoL keyword scoring + the semantic pass.
     auto_fetch_description = True
     _DESC_SELECTOR = 'main'
@@ -72,11 +72,11 @@ class BuiltInNYCScraper(BaseScraper):
         cfg = load_source_config(self.source_name)
         max_pages = int(cfg.get("max_pages") or self.DEFAULT_MAX_PAGES)
 
-        seen_hrefs: set[str] = set
+        seen_hrefs: set[str] = set()
         for page in range(1, max_pages + 1):
             # BuiltIn uses /jobs?page=N for pagination.
             url = self.LIST_URL if page == 1 else f"{self.LIST_URL}?page={page}"
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     url,
@@ -86,7 +86,7 @@ class BuiltInNYCScraper(BaseScraper):
                     },
                     timeout=30,
                 )
-                resp.raise_for_status
+                resp.raise_for_status()
             except requests.RequestException:
                 break
 
@@ -167,7 +167,7 @@ class BuiltInNYCScraper(BaseScraper):
         # the city. Each is preceded by a <i> icon (fa-house-building for
         # work mode, fa-location-dot for city). We collect both and join
         # so the score engine sees e.g. "In-Office, New York, NY".
-        location_parts: list[str] = 
+        location_parts: list[str] = []
         attr_section = soup.find(class_=re.compile(r"bounded-attribute-section"))
         if attr_section:
             for icon in attr_section.find_all("i", class_=re.compile(
@@ -177,7 +177,7 @@ class BuiltInNYCScraper(BaseScraper):
                 # the first text-bearing span.
                 wrapper = icon.find_parent("div")
                 if wrapper:
-                    sibling = wrapper.find_next_sibling
+                    sibling = wrapper.find_next_sibling()
                     if sibling:
                         text = _clean(sibling.get_text(" ", strip=True))
                         if text:
@@ -200,7 +200,7 @@ class BuiltInNYCScraper(BaseScraper):
         # remote inference. BuiltIn uses "Remote", "Hybrid", "In-Office".
         remote = None
         if location:
-            lower = location.lower
+            lower = location.lower()
             if "remote" in lower:
                 remote = True
             elif "in-office" in lower or "in office" in lower or "onsite" in lower:

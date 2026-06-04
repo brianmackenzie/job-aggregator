@@ -1,14 +1,14 @@
 """BaseScraper — the engine for every scraper plugin.
 
 Subclasses implement only:
-    fetch  -> Iterable[dict]           yield raw source payloads
+    fetch()  -> Iterable[dict]           yield raw source payloads
     parse(p) -> Optional[RawJob]         convert one payload to a RawJob
 
-Everything else — retry-free-of-care, rate limiting via self._throttle,
+Everything else — retry-free-of-care, rate limiting via self._throttle(),
 per-item try/except, dedup via job_id, ScrapeRuns bookkeeping, and a
-raw-payload archive to S3 — lives in `scrape_run` on this class.
+raw-payload archive to S3 — lives in `scrape_run()` on this class.
 
-This is deliberate: the daily dispatcher will call scrape_run on 20+
+This is deliberate: the daily dispatcher will call scrape_run() on 20+
 different sources, and one flaky source must never break the others.
 By centralizing error handling here we guarantee that property.
 """
@@ -45,7 +45,7 @@ def strip_html(html: Optional[str], max_chars: int = 12000) -> Optional[str]:
     Turns ATS/board job-description HTML into the plain-text `description`
     the scoring engine + QoL keyword scan expect. bs4 is imported lazily so
     base.py stays importable in minimal test envs; a regex tag-strip is the
-    fallback. Returns None for empty/whitespace-only input so normalize
+    fallback. Returns None for empty/whitespace-only input so normalize()
     omits the field instead of storing an empty attribute.
     """
     if not html:
@@ -55,7 +55,7 @@ def strip_html(html: Optional[str], max_chars: int = 12000) -> Optional[str]:
         text = BeautifulSoup(html, "html.parser").get_text(" ", strip=True)
     except Exception:
         text = re.sub(r"<[^>]+>", " ", html)
-    text = re.sub(r"\s+", " ", text or "").strip
+    text = re.sub(r"\s+", " ", text or "").strip()
     if not text:
         return None
     return text[:max_chars]
@@ -94,7 +94,7 @@ def extract_job_description(html, css_selector=None, max_chars: int = 12000):
 
     # 1) JSON-LD JobPosting.description
     for s in soup.find_all("script", type="application/ld+json"):
-        raw = (s.string or s.get_text or "").strip
+        raw = (s.string or s.get_text() or "").strip()
         if not raw or "JobPosting" not in raw:
             continue
         try:
@@ -127,8 +127,8 @@ def extract_job_description(html, css_selector=None, max_chars: int = 12000):
 
 @dataclass
 class RawJob:
-    """Source-agnostic intermediate form. Produced by parse, consumed
-    by BaseScraper.normalize which maps it onto the Jobs table shape."""
+    """Source-agnostic intermediate form. Produced by parse(), consumed
+    by BaseScraper.normalize() which maps it onto the Jobs table shape."""
     native_id: str
     title: str
     company: str
@@ -154,12 +154,12 @@ class BaseScraper(ABC):
     # EventBridge schedule expression, e.g. "cron(0 6 * * ? *)" or "rate(1 day)".
     # Read by the dispatcher when wiring EventBridge rules.
     schedule: str = ""
-    # Max requests/sec inside fetch. Subclasses call self._throttle between
+    # Max requests/sec inside fetch(). Subclasses call self._throttle() between
     # HTTP calls to respect this.
     rate_limit_rps: float = 1.0
     # Generic detail-page description enrichment (opt-in). When True,
-    # scrape_run fetches each job's detail page (RawJob.url) and extracts
-    # the description (JSON-LD first, then _DESC_SELECTOR) whenever parse
+    # scrape_run() fetches each job's detail page (RawJob.url) and extracts
+    # the description (JSON-LD first, then _DESC_SELECTOR) whenever parse()
     # didn't already set one. For boards whose list/card payload omits the
     # JD. Bounded by max_desc_fetches/run; throttled; best-effort.
     auto_fetch_description: bool = False
@@ -176,8 +176,8 @@ class BaseScraper(ABC):
 
     @abstractmethod
     def fetch(self) -> Iterable[dict]:
-        """Yield raw source payloads. Each one is handed to parse.
-        Call self._throttle between HTTP requests."""
+        """Yield raw source payloads. Each one is handed to parse().
+        Call self._throttle() between HTTP requests."""
 
     @abstractmethod
     def parse(self, payload: dict) -> Optional[RawJob]:
@@ -187,14 +187,14 @@ class BaseScraper(ABC):
 
     def _throttle(self) -> None:
         """Sleep long enough to keep our request rate at or below
-        rate_limit_rps. Call this once per HTTP request inside fetch."""
+        rate_limit_rps. Call this once per HTTP request inside fetch()."""
         if self.rate_limit_rps <= 0:
             return
         min_interval = 1.0 / self.rate_limit_rps
-        elapsed = time.monotonic - self._last_request_at
+        elapsed = time.monotonic() - self._last_request_at
         if elapsed < min_interval:
             time.sleep(min_interval - elapsed)
-        self._last_request_at = time.monotonic
+        self._last_request_at = time.monotonic()
 
     def _fetch_detail_description(self, url, css_selector=None,
                                  extra_headers=None):
@@ -215,14 +215,14 @@ class BaseScraper(ABC):
         }
         if extra_headers:
             headers.update(extra_headers)
-        self._throttle
+        self._throttle()
         try:
             resp = requests.get(url, headers=headers, timeout=30)
-            resp.raise_for_status
+            resp.raise_for_status()
             # requests defaults to ISO-8859-1 for text/html without a declared
             # charset, which mojibakes UTF-8 curly quotes; prefer the detected
             # encoding so the description text is clean.
-            if not resp.encoding or resp.encoding.lower == "iso-8859-1":
+            if not resp.encoding or resp.encoding.lower() == "iso-8859-1":
                 resp.encoding = resp.apparent_encoding or "utf-8"
         except Exception:
             return None
@@ -263,13 +263,13 @@ class BaseScraper(ABC):
         """Recursively convert Python floats to Decimal for DynamoDB.
 
         boto3's DynamoDB Table resource raises TypeError on plain floats.
-        Converting via str preserves the rounded representation without
+        Converting via str() preserves the rounded representation without
         introducing binary-float precision issues.
         """
         if isinstance(obj, float):
             return Decimal(str(obj))
         if isinstance(obj, dict):
-            return {k: BaseScraper._to_dynamo(v) for k, v in obj.items}
+            return {k: BaseScraper._to_dynamo(v) for k, v in obj.items()}
         if isinstance(obj, list):
             return [BaseScraper._to_dynamo(i) for i in obj]
         return obj
@@ -301,7 +301,7 @@ class BaseScraper(ABC):
         """
         try:
             # Pull any existing semantic_* fields off the prior DynamoDB
-            # row so the cache check inside score_combined can work.
+            # row so the cache check inside score_combined() can work.
             # If this is a brand-new job there's nothing to merge.
             from common import db as _db
             existing = _db.get_job(row["job_id"])
@@ -357,9 +357,9 @@ class BaseScraper(ABC):
             # so a brand-new row immediately has chips/sort data without
             # waiting for the next nightly RescoreFn pass.
             if result.get("industries") is not None:
-                row["industries"] = result.get("industries") or 
+                row["industries"] = result.get("industries") or []
             if result.get("role_types") is not None:
-                row["role_types"] = result.get("role_types") or 
+                row["role_types"] = result.get("role_types") or []
             if result.get("qol_score") is not None:
                 row["qol_score"] = int(result.get("qol_score") or 0)
             if result.get("qol_breakdown") is not None:
@@ -389,25 +389,25 @@ class BaseScraper(ABC):
 
         Contract:
           * Per-item exceptions are caught and logged; they do NOT abort.
-          * A top-level fetch failure aborts this source only.
+          * A top-level fetch() failure aborts this source only.
           * Exactly one ScrapeRuns row is written regardless of outcome.
           * All raw payloads are archived to S3 for debugging.
         Returns the ScrapeRuns summary dict.
         """
-        run_started = time.monotonic
+        run_started = time.monotonic()
         run_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         jobs_found = 0
         jobs_new = 0
         jobs_updated = 0
-        errors: list[str] = 
-        raw_payloads: list[dict] = 
+        errors: list[str] = []
+        raw_payloads: list[dict] = []
         status = "ok"
         self._desc_fetches = 0   # per-run detail-fetch budget counter
 
         log.info("scrape_run_start", source=self.source_name)
 
         try:
-            for payload in self.fetch:
+            for payload in self.fetch():
                 jobs_found += 1
                 raw_payloads.append(payload)
                 try:
@@ -418,7 +418,7 @@ class BaseScraper(ABC):
                     # Generic description enrichment (opt-in). Boards whose
                     # list/card payload lacks the JD set auto_fetch_description;
                     # we fetch the detail page (RawJob.url) once — JSON-LD first,
-                    # then _DESC_SELECTOR — when parse left description empty.
+                    # then _DESC_SELECTOR — when parse() left description empty.
                     # Bounded + throttled + best-effort (failure -> stays None).
                     if (self.auto_fetch_description and not raw.description
                             and raw.url
@@ -446,7 +446,7 @@ class BaseScraper(ABC):
                         traceback=traceback.format_exc(limit=3),
                     )
         except Exception as exc:
-            # fetch itself blew up. Run is over, but we still record
+            # fetch() itself blew up. Run is over, but we still record
             # a row so health.html shows the failure.
             status = "error"
             errors.append(f"{type(exc).__name__}: {exc}")
@@ -472,10 +472,10 @@ class BaseScraper(ABC):
                     error=str(exc),
                 )
 
-        duration_ms = int((time.monotonic - run_started) * 1000)
+        duration_ms = int((time.monotonic() - run_started) * 1000)
         expires_at = int(
             (datetime.now(timezone.utc) + timedelta(days=_SCRAPE_RUN_TTL_DAYS))
-            .timestamp
+            .timestamp()
         )
 
         summary = {
@@ -515,11 +515,11 @@ class BaseScraper(ABC):
         y, m, d = date_part.split("-")
         key = (
             f"raw/{self.source_name}/{y}/{m}/{d}/"
-            f"{run_ts}-{uuid.uuid4.hex[:8]}.jsonl.gz"
+            f"{run_ts}-{uuid.uuid4().hex[:8]}.jsonl.gz"
         )
 
         # Gzip in memory. Raw scrape volumes are small (<10MB typical).
-        buf = io.BytesIO
+        buf = io.BytesIO()
         with gzip.GzipFile(fileobj=buf, mode="wb") as gz:
             for p in payloads:
                 gz.write((json.dumps(p, default=str) + "\n").encode("utf-8"))
@@ -527,7 +527,7 @@ class BaseScraper(ABC):
         self._s3_client.put_object(
             Bucket=bucket,
             Key=key,
-            Body=buf.getvalue,
+            Body=buf.getvalue(),
             ContentType="application/x-ndjson",
             ContentEncoding="gzip",
         )

@@ -34,7 +34,7 @@ _WHITESPACE_RE = re.compile(r"\s+")
 def _clean(s: str) -> str:
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 def _text_of(soup: BeautifulSoup, *,
@@ -57,7 +57,7 @@ class GamesIndustryScraper(BaseScraper):
     schedule = "cron(30 6 * * ? *)"
     rate_limit_rps = 0.5
     # 2026-06-03: detail-page descriptions (listing omits JD).
-    # scrape_run fetches RawJob.url + JSON-LD first, then this selector.
+    # scrape_run() fetches RawJob.url + JSON-LD first, then this selector.
     auto_fetch_description = True
     _DESC_SELECTOR = 'div.prose'
 
@@ -72,11 +72,11 @@ class GamesIndustryScraper(BaseScraper):
         cfg = load_source_config(self.source_name)
         max_pages = int(cfg.get("max_pages") or self.DEFAULT_MAX_PAGES)
 
-        seen_hrefs: set[str] = set
+        seen_hrefs: set[str] = set()
         for page in range(1, max_pages + 1):
             # GI uses ?page=N for pagination.
             url = self.LIST_URL if page == 1 else f"{self.LIST_URL}?page={page}"
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     url,
@@ -86,7 +86,7 @@ class GamesIndustryScraper(BaseScraper):
                     },
                     timeout=30,
                 )
-                resp.raise_for_status
+                resp.raise_for_status()
             except requests.RequestException:
                 break
 
@@ -115,7 +115,7 @@ class GamesIndustryScraper(BaseScraper):
                 # The card root is <article class="node--job-per-template ...">.
                 # The anchor itself appears TWICE inside it (logo + h2 title) —
                 # both anchors are wrapped by the same article. We want the full
-                # article so parse can see the h2 title, the company span,
+                # article so parse() can see the h2 title, the company span,
                 # and the location div. anchor.parent is just <div class="job__logo">
                 # which holds only the logo (not enough).
                 article = anchor.find_parent(
@@ -182,7 +182,7 @@ class GamesIndustryScraper(BaseScraper):
             raw_date = _clean(date_node.get_text(" ", strip=True)).rstrip(",")
             for fmt in ("%d %b %Y", "%d %B %Y"):
                 try:
-                    posted_at = datetime.strptime(raw_date, fmt).isoformat
+                    posted_at = datetime.strptime(raw_date, fmt).isoformat()
                     break
                 except ValueError:
                     continue
@@ -196,7 +196,7 @@ class GamesIndustryScraper(BaseScraper):
 
         remote = None
         if location:
-            lower = location.lower
+            lower = location.lower()
             if "remote" in lower:
                 remote = True
             elif "onsite" in lower or "on-site" in lower or "office" in lower:

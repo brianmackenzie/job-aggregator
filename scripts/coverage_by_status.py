@@ -27,7 +27,7 @@ def _scan_segment(segment: int) -> dict[tuple[str, bool], int]:
         if token:
             kwargs["ExclusiveStartKey"] = token
         resp = ddb.scan(**kwargs)
-        for item in resp.get("Items", ):
+        for item in resp.get("Items", []):
             status = item.get("status", {}).get("S", "<none>")
             has_pf = "passed_prefilter" in item
             key = (status, has_pf)
@@ -38,12 +38,12 @@ def _scan_segment(segment: int) -> dict[tuple[str, bool], int]:
     return buckets
 
 
-def main -> None:
+def main() -> None:
     # 8-way parallel scan for speed.
     combined: dict[tuple[str, bool], int] = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
         for b in pool.map(_scan_segment, range(8)):
-            for k, v in b.items:
+            for k, v in b.items():
                 combined[k] = combined.get(k, 0) + v
 
     # Aggregate per status.
@@ -63,4 +63,4 @@ def main -> None:
 
 
 if __name__ == "__main__":
-    main
+    main()

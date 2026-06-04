@@ -1,8 +1,8 @@
 """BettingJobs scraper — Applyflow JSON API.
 
 BettingJobs (https://www.bettingjobs.com) is the largest specialist
-recruiter for the iGaming / sportsbook industry. Highest signal-per-job
-ratio of any source for the user's iGaming track.
+recruiter for the online wagering / sportsbook industry. Highest signal-per-job
+ratio of any source for the user's online wagering track.
 
 # History
 
@@ -84,10 +84,10 @@ def _strip_html(html: str) -> str:
             return _WHITESPACE_RE.sub(
                 " ",
                 BeautifulSoup(html, "html.parser").get_text(" ", strip=True),
-            ).strip
+            ).strip()
         except Exception:
-            return _WHITESPACE_RE.sub(" ", _HTML_TAG_RE.sub(" ", html)).strip
-    return _WHITESPACE_RE.sub(" ", html).strip
+            return _WHITESPACE_RE.sub(" ", _HTML_TAG_RE.sub(" ", html)).strip()
+    return _WHITESPACE_RE.sub(" ", html).strip()
 
 
 def _coerce_int(v) -> Optional[int]:
@@ -145,9 +145,9 @@ class BettingJobsScraper(BaseScraper):
             **self.BUCKET_HEADERS,
         }
 
-        seen_uuids: set[str] = set
+        seen_uuids: set[str] = set()
         for page in range(1, max_pages + 1):
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     self.API_URL,
@@ -155,15 +155,15 @@ class BettingJobsScraper(BaseScraper):
                     params={"page": page, "resultsPerPage": results_per_page},
                     timeout=30,
                 )
-                resp.raise_for_status
-                envelope = resp.json
+                resp.raise_for_status()
+                envelope = resp.json()
             except (requests.RequestException, ValueError, json.JSONDecodeError):
                 # Stop pagination, don't fail the whole run. The base
                 # class records a partial-run row in ScrapeRuns.
                 break
 
             search_results = envelope.get("search_results") or {}
-            jobs           = search_results.get("jobs") or 
+            jobs           = search_results.get("jobs") or []
             if not jobs:
                 # Past the end of the listing.
                 break
@@ -188,14 +188,14 @@ class BettingJobsScraper(BaseScraper):
 
     def parse(self, payload: dict) -> Optional[RawJob]:
         uuid       = payload.get("uuid") or payload.get("id")
-        title      = (payload.get("job_title") or "").strip
-        company    = (payload.get("company_name") or "").strip or "BettingJobs"
+        title      = (payload.get("job_title") or "").strip()
+        company    = (payload.get("company_name") or "").strip() or "BettingJobs"
         if not uuid or not title:
             return None
 
         # URL fields: `URL` is a slug like 'french-social-media-specialist/<uuid>'.
         # The public detail page lives at `/jobs/<URL>/`.
-        url_slug = (payload.get("URL") or "").strip
+        url_slug = (payload.get("URL") or "").strip()
         public_url = (
             f"{self.PUBLIC_BASE_URL}/jobs/{url_slug}/"
             if url_slug else f"{self.PUBLIC_BASE_URL}/jobs/{uuid}/"
@@ -214,13 +214,13 @@ class BettingJobsScraper(BaseScraper):
 
         # Location: location_label is the human-readable form
         # ("France, Remote", "London, UK", "Malta", etc.).
-        location = (payload.get("location_label") or "").strip or None
+        location = (payload.get("location_label") or "").strip() or None
 
         # Remote inference: location_state_code starts with "remote-" when
         # the role is remote, e.g. "remote-france". Belt-and-braces with the
         # location_label substring check.
-        state_code = (payload.get("location_state_code") or "").lower
-        loc_lower  = location.lower if location else ""
+        state_code = (payload.get("location_state_code") or "").lower()
+        loc_lower  = location.lower() if location else ""
         if "remote" in loc_lower or state_code.startswith("remote"):
             remote = True
         elif "onsite" in loc_lower or "on-site" in loc_lower:

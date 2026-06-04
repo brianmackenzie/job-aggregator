@@ -57,7 +57,7 @@ def _strip_html(s: str) -> str:
         return ""
     text = _TAG_RE.sub(" ", s)
     text = html.unescape(text)
-    return _WHITESPACE_RE.sub(" ", text).strip
+    return _WHITESPACE_RE.sub(" ", text).strip()
 
 
 def _split_company_and_title(raw_title: str) -> tuple[str, str]:
@@ -68,9 +68,9 @@ def _split_company_and_title(raw_title: str) -> tuple[str, str]:
     colon at all, return ("", raw_title) and let the caller skip.
     """
     if ":" not in raw_title:
-        return "", raw_title.strip
+        return "", raw_title.strip()
     company, _, role = raw_title.partition(":")
-    return company.strip, role.strip
+    return company.strip(), role.strip()
 
 
 @register("weworkremotely")
@@ -91,7 +91,7 @@ class WeWorkRemotelyScraper(BaseScraper):
         categories = cfg.get("categories") or _DEFAULT_CATEGORIES
 
         for slug in categories:
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     self.FEED_URL_TEMPLATE.format(slug=slug),
@@ -101,7 +101,7 @@ class WeWorkRemotelyScraper(BaseScraper):
                     },
                     timeout=30,
                 )
-                resp.raise_for_status
+                resp.raise_for_status()
             except Exception:
                 # Per-category failure must not abort the whole source.
                 # Re-raise so the BaseScraper run loop logs it as a per-item
@@ -109,7 +109,7 @@ class WeWorkRemotelyScraper(BaseScraper):
                 raise
 
             # Parse XML and yield one dict per <item>. We tag the category
-            # so parse can stash it on the raw payload for debugging.
+            # so parse() can stash it on the raw payload for debugging.
             try:
                 root = ET.fromstring(resp.content)
             except ET.ParseError:
@@ -123,8 +123,8 @@ class WeWorkRemotelyScraper(BaseScraper):
                 yield payload
 
     def parse(self, payload: dict) -> Optional[RawJob]:
-        raw_title = (payload.get("title") or "").strip
-        link = (payload.get("link") or payload.get("guid") or "").strip
+        raw_title = (payload.get("title") or "").strip()
+        link = (payload.get("link") or payload.get("guid") or "").strip()
         if not raw_title or not link:
             return None
 
@@ -139,8 +139,8 @@ class WeWorkRemotelyScraper(BaseScraper):
         native_id = link.rsplit("/", 1)[-1] or link
 
         description = _strip_html(payload.get("description") or "")
-        location = (payload.get("region") or "").strip or "Remote"
-        posted_at = (payload.get("pubDate") or "").strip or None
+        location = (payload.get("region") or "").strip() or "Remote"
+        posted_at = (payload.get("pubDate") or "").strip() or None
 
         return RawJob(
             native_id=native_id,

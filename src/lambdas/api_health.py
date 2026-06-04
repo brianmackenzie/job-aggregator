@@ -11,7 +11,7 @@ the API Gateway-side cold start cost is negligible (<50ms).
 """
 import json
 
-# Import every implemented scraper so list_scrapers returns the full set.
+# Import every implemented scraper so list_scrapers() returns the full set.
 # Mirror of scrape_worker.py — keep these in sync when adding sources.
 # daily JSON sources
 from scrapers import himalayas as _himalayas      # noqa: F401
@@ -55,8 +55,8 @@ from scrapers.registry import list_scrapers
 
 
 def handler(event, context):
-    runs: list[dict] = 
-    for source in list_scrapers:
+    runs: list[dict] = []
+    for source in list_scrapers():
         try:
             runs.extend(db.get_recent_scrape_runs(source, limit=3))
         except Exception as exc:
@@ -85,7 +85,7 @@ def handler(event, context):
             "ok": True,
             "service": "jobs-aggregator",
             "phase": 3,
-            "registered_sources": list_scrapers,
+            "registered_sources": list_scrapers(),
             "scrape_runs": runs[:20],
         }, default=str),
     }

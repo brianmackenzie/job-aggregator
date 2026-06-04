@@ -1,61 +1,31 @@
 """
-# PERSONAL PROFILE DATA — REPLACE BEFORE USING AT SCALE
-#
-# This module contains constants that encode the ORIGINAL AUTHOR'S
-# personal job-search profile (geography, target companies, target
-# keywords, career-history heuristics). Shipping these as-is in a
-# public fork is safe (the data is not secret) but the scoring
-# behavior will be tuned for the original author, not you.
-#
-# For a proper fork:
-#   1. Edit `config/candidate_profile.yaml` first — it drives the
-#      Claude Haiku semantic layer, which is the dominant signal.
-#   2. Come back here and rewrite the constants below to match
-#      your own geography, industry keywords, and company lists.
-#
-# See `docs/FORKING.md` for a file-by-file guide.
-"""
+src/scoring/candidate_profile.py — candidate profile for the scoring pipeline.
 
-"""
-src/scoring/candidate_profile.py — the original author-specific candidate profile.
-
-Source of truth for WHO the original author is as a candidate. This file is deliberately
-plain-Python (no YAML) because the scoring refactor stopped
-treating the keyword lists as a bag-of-weights. Instead they fall into
-three clearly named categories that match how the new algo_prefilter +
-Haiku semantic layer actually use them:
+Source of truth for WHO the candidate is. Deliberately plain-Python (not
+YAML) so that assertion-style calibration tests can import and diff the
+lists directly. The keyword lists fall into three named categories that
+match how algo_prefilter + the Haiku semantic layer use them:
 
     1. HARD_DISQUALIFIERS  — any match kills the job before semantic.
-                             No weighting. No blend. Binary auto-reject.
-    2. SOFT_WARNINGS       — flag for Haiku to weigh. Never auto-kill.
-                             Haiku decides whether the role is still worth it.
+                             No weighting. Binary auto-reject.
+    2. SOFT_WARNINGS       — flag for the semantic layer to weigh. Never
+                             auto-kill. The model decides if it's worth it.
     3. POSITIVE_SIGNALS    — diagnostic flagging only. NOT for score math.
-                             Used to surface "why did this rank high?" in
-                             UI / markdown export and to help Haiku's prompt.
+                             Surfaces "why did this rank high?" in the UI.
 
-Also preserved (unchanged from config/scoring.yaml):
-    - COMPANY_INDUSTRY_MAP (company → industry bucket)
-    - INDUSTRY_SCORES      (bucket → relative score, still useful for flags)
-    - INDUSTRY_KEYWORDS    (fallback classifier keywords)
-    - CRUNCH_COMPANIES     (studios with documented crunch culture)
-    - HRC100_COMPANIES     (HRC Corporate Equality Index — LGBTQ flag)
-    - COMMUTE_CITIES       (NYC + NJ ZIP of zones commutable from Anytown)
+Also preserved:
+    - COMPANY_INDUSTRY_MAP (company -> industry bucket)
+    - INDUSTRY_SCORES      (bucket -> relative 0-10 score, for flags)
+    - INDUSTRY_KEYWORDS    (fallback keyword classifier)
+    - CRUNCH_COMPANIES     (companies with documented crunch culture)
+    - HRC100_COMPANIES     (HRC Corporate Equality Index — inclusion flag)
+    - LOCATION_PATTERNS    (geography zones for commute classification)
     - COMP_THRESHOLDS      (base+bonus floor/target/ceiling, USD)
 
-Why it's Python and not YAML:
-    the original author's direction on the refactor was explicit — "Python
-    constants, not YAML, so that assertion-style calibration tests can
-    import and diff the lists". The YAML file `config/scoring.yaml` is
-    being kept for the weighted score math that algo_prefilter still
-    performs as a diagnostic in the prefilter's internal `algo_score`
-    output, but the CATEGORIES a job falls into (hard-disq vs soft-warn
-    vs positive-signal) live here.
-
-Size note:
-    HARD_DISQUALIFIERS.titles.function is ~500 entries. Don't panic —
-    almost every entry was observed in live Phase-6 / rescore audits
-    (Rounds 4 through 9 of title-gate tuning). Each block has a comment
-    explaining which audit round added it and why.
+FORK NOTE: every constant below encodes one example candidate's profile.
+Rewrite the geography, target companies, industry preferences, and
+keyword lists to match your own search. `config/candidate_profile.yaml`
+drives the dominant semantic signal — edit that first.
 """
 from __future__ import annotations
 
@@ -90,7 +60,7 @@ from __future__ import annotations
 
 
 # ---- WRONG_FUNCTION_TITLES --------------------------------------------------
-# Titles indicating an IC or wrong-function role the original author cannot credibly target.
+# Titles indicating an IC or wrong-function role the candidate cannot credibly target.
 # Case-insensitive substring match against TITLE ONLY (not description).
 # Ported verbatim from src/scoring/gates.py::_FUNCTION_GATE_KWS (rounds 1-9+).
 HARD_DISQUALIFIER_TITLES_FUNCTION: list[str] = [
@@ -103,7 +73,7 @@ HARD_DISQUALIFIER_TITLES_FUNCTION: list[str] = [
     "ios engineer", "android engineer", "qa engineer", "test engineer",
     "cloud engineer", "infrastructure engineer", "computer vision engineer",
     "ai engineer", "applied scientist",
-    # Gaming-specific IC engineer / programmer suffixes
+    # domain-specific IC engineer / programmer suffixes
     "engine programmer", "engine developer", "engine engineer", "core engine",
     "gameplay engineer", "gameplay programmer", "graphics engineer",
     "graphics programmer", "rendering engineer", "rendering programmer",
@@ -144,7 +114,7 @@ HARD_DISQUALIFIER_TITLES_FUNCTION: list[str] = [
     "learning and coaching", "learning & coaching",
     "learning and development", "hr operations", "people operations",
     "employee relations", "diversity & inclusion", "dei ",
-    # Marketing leadership — the original author is pivoting AWAY
+    # Marketing leadership — the candidate is moving away
     "head of marketing", "vp of marketing", "vp marketing", "vp, marketing",
     "chief marketing", "cmo", "director of marketing", "marketing director",
     "head of growth", "vp of growth", "user growth", "head of user growth",
@@ -248,8 +218,8 @@ HARD_DISQUALIFIER_TITLES_FUNCTION: list[str] = [
     "staff product manager", "lead product manager",
     "associate product manager", "product manager,",
     # NOTE "technical program manager" REMOVED from
-    # HARD list and moved to SOFT_WARNING_TPM (below). the original author flagged
-    # "Senior Technical Program Manager" titles at gaming dream-cos
+    # HARD list and moved to SOFT_WARNING_TPM (below). the candidate flagged
+    # "Senior Technical Program Manager" titles at top-tier target companies
     # being killed despite being legitimate program-leadership work.
     # "senior tpm" stays as a hard kill — that's clearly the IC TPM
     # acronym shape.
@@ -312,7 +282,7 @@ HARD_DISQUALIFIER_TITLES_FUNCTION: list[str] = [
     "administrative coordinator", "help desk support", "desktop support",
     "national account manager", "exhibit designer", "store designer",
     "good store designer", "narrative designer", "product owner",
-    # FanDuel pattern — HR/comp/DEI/analytics/casino
+    # a regulated wagering platform pattern — HR/comp/DEI/analytics/wagering
     "director of compensation", "director, compensation",
     "compensation director", "head of compensation", "vp of compensation",
     "vp, compensation", "vp compensation", "senior director, compensation",
@@ -330,9 +300,9 @@ HARD_DISQUALIFIER_TITLES_FUNCTION: list[str] = [
     "director of analytics", "director, analytics", "analytics director",
     "analytics senior director", "senior director, analytics",
     "senior director of analytics", "analytics manager",
-    "senior analytics manager", "casino analyst", "casino manager",
-    "casino operations",
-    # b (FanDuel function-suffix forms)
+    "senior analytics manager", "wagering analyst", "wagering manager",
+    "wagering operations",
+    # b (a regulated wagering platform function-suffix forms)
     "marketing sciences", "marketing science", "marketing technology",
     "marketing automation", "marketing operations", "marketing data",
     "marketing vice president", "marketing senior vice president",
@@ -347,15 +317,15 @@ HARD_DISQUALIFIER_TITLES_FUNCTION: list[str] = [
     "crm operations", "crm associate", "crm analyst",
     "operational excellence", "commercial strategy manager",
     "commercial strategy associate", "commercial strategy analyst",
-    "commercial strategy senior", "responsible gaming",
+    "commercial strategy senior", "regulated wagering compliance",
     "responsible gambling", "accountant", "general ledger accountant",
     "gl accountant", "ap accountant", "ar accountant",
     "accounting manager", "accounting associate", "accounting specialist",
     "systems administrator", "data product manager",
     "performance & insights", "performance and insights",
     "trading manager", "trading senior manager", "trading associate",
-    "pokerstars", "creator operations", "community operations",
-    # additions (the original author explicit: cybersecurity/risk/compliance out)
+    "a wagering brand", "creator operations", "community operations",
+    # additions (the candidate explicit: cybersecurity/risk/compliance out)
     "chief risk", "chief risk officer", "cro,", "vp risk", "vp, risk",
     "vp of risk", "head of risk", "director of risk", "director, risk",
     "risk director", "senior director, risk", "senior director of risk",
@@ -392,7 +362,7 @@ HARD_DISQUALIFIER_TITLES_FUNCTION: list[str] = [
     "vp of supply chain", "vp supply chain", "policy director",
     "director of policy", "director, policy", "quant analyst",
     "quant trader", "quantitative analyst", "renewable energy project",
-    # c FanDuel final tightening
+    # c a regulated wagering platform final tightening
     "change manager", "change lead", "change management", "change analyst",
     "customer marketing", "customer engagement",
     "customer experience manager", "customer experience associate",
@@ -433,7 +403,7 @@ HARD_DISQUALIFIER_TITLES_FUNCTION: list[str] = [
 
 
 # ---- SUB_VP_SENIORITY -------------------------------------------------------
-# Title markers indicating sub-VP seniority that the original author cannot credibly target.
+# Title markers indicating sub-VP seniority that the candidate cannot credibly target.
 # Case-insensitive substring match against TITLE ONLY.
 # NOTE: "associate" NOT included here — it needs context-sensitive handling
 # ("Associate Vice President" at insurance/finance is legit exec). The
@@ -452,7 +422,7 @@ HARD_DISQUALIFIER_TITLES_SENIORITY: list[str] = [
 
 # ---- UNPAID_ENGAGEMENT ------------------------------------------------------
 # Full-text (title OR description) phrases indicating unpaid / commission-only
-# roles. the original author can't take these. Source: YAML engagement_disqualifiers.
+# roles. the candidate can't take these. Source: YAML engagement_disqualifiers.
 HARD_DISQUALIFIER_ENGAGEMENT: list[str] = [
     "commission only",
     "no base salary",
@@ -464,13 +434,13 @@ HARD_DISQUALIFIER_ENGAGEMENT: list[str] = [
 
 # ---- LEADERSHIP_EXCEPTIONS --------------------------------------------------
 # Exec / leadership phrases that, when present in the title, EXEMPT the job
-# from HARD_DISQUALIFIER_TITLES_FUNCTION. They signal a role the original author could
+# from HARD_DISQUALIFIER_TITLES_FUNCTION. They signal a role the candidate could
 # legitimately hold even though some substring might overlap a blocked
 # function kw (e.g., "VP of Engineering" contains "engineering"). These
 # are matched via simple substring.
 #
 # Intentionally narrow — CMO / CFO / CHRO / CRO / Creative Director all
-# REMOVED (wrong function at exec level per the original author's explicit direction in
+# REMOVED (wrong function at exec level per the candidate's explicit direction in
 # ).
 LEADERSHIP_EXCEPTIONS: list[str] = [
     # Engineering executive
@@ -495,7 +465,7 @@ LEADERSHIP_EXCEPTIONS: list[str] = [
     "chief strategy", "vp of strategy", "head of strategy",
     "strategic advisor", "operating partner", "executive advisor",
     # Analyst-firm exec titles — Gartner / Forrester / IDC VP Analyst and
-    # Principal Analyst are senior-IC thought-leadership roles the original author
+    # Principal Analyst are senior-IC thought-leadership roles the candidate
     # legitimately targets. Must exempt BEFORE the "analyst" disqualifier
     # kill fires. (Added .)
     "vp analyst", "vp, analyst", "principal analyst",
@@ -503,12 +473,12 @@ LEADERSHIP_EXCEPTIONS: list[str] = [
     "chief data", "vp of platform", "vp platform", "vp, platform",
     "head of platform", "platform director", "director of platform",
     # Online services / live service / infrastructure exec — 
-    # add. Canonical the original author targets like "VP, Platform Engineering" at
-    # Roblox and "VP Online Services" at 2K contain "platform engineer"
+    # add. Canonical the candidate targets like "VP, Platform Engineering" at
+    # a large platform company and a VP-level title contain "platform engineer"
     # / "engineering" which otherwise trip the function disqualifier.
     # These phrases exempt the title substring-check so the prefilter
     # doesn't mis-gate core lane roles.
-    "vp of online services", "vp online services", "vp, online services",
+    "vp of online services", "a VP-level title", "vp, online services",
     "head of online services", "director of online services",
     "vp of infrastructure", "vp infrastructure", "vp, infrastructure",
     "head of infrastructure", "director of infrastructure",
@@ -542,7 +512,7 @@ LEADERSHIP_ACRONYM_EXCEPTIONS: list[str] = [
 # ---- LEADERSHIP_WHITELIST_PATTERNS ------------------------------------------
 # New regex-based whitelist that short-circuits the wrong-
 # function gate when the title clearly carries an executive / leadership
-# role-noun. the original author's audit of the 10,635 active rows surfaced these
+# role-noun. an audit of the active rows
 # false-killed titles:
 #
 #   "Senior Engineering Manager"
@@ -590,17 +560,17 @@ LEADERSHIP_WHITELIST_PATTERNS: list[str] = [
     r"\bsr\.?\s+director\b",
     r"\bexecutive\s+director\b",
     r"\bmanaging\s+director\b",
-    # Associate Director + technology-noun (the original author's Test C — "Associate
+    # Associate Director + technology-noun (the candidate's Test C — "Associate
     # Director, Platform AI Architect" must pass). Allow any chars in
     # between to handle "Associate Director, Platform" / "Associate
     # Director - Engineering" / etc.
     r"\bassociate\s+director\b[^.]*?\b(?:architect|platform|strategy|technology|engineering)\b",
     # Manager-level titles that in practice ARE engineering leadership.
-    # "Engineering Manager" is the canonical one — the original author's Test A.
+    # "Engineering Manager" is the canonical one — the candidate's Test A.
     r"\b(?:engineering|technology|platform|technical\s+program|program)\s+manager\b",
     # Analyst-firm thought-leader titles (Gartner / Forrester / IDC).
     # "VP Analyst" is a Gartner exec-IC title; "Sr Director Analyst"
-    # is the next tier up. the original author's Test B — "Sr Director Analyst, AI
+    # is the next tier up. the candidate's Test B — "Sr Director Analyst, AI
     # and Software Engineering" must pass.
     r"\bprincipal\s+analyst\b",
     r"\bvp\s+analyst\b",
@@ -612,7 +582,7 @@ LEADERSHIP_WHITELIST_PATTERNS: list[str] = [
 # ---- PRIORITY_DISQUALIFIERS -------------------------------------------------
 # Phrases that ALWAYS kill the job, even if a LEADERSHIP_EXCEPTION would
 # otherwise protect it. Use sparingly for pivot-away lanes: D2C / performance
-# marketing / ads work that the original author is explicitly leaving behind.
+# marketing / ads work that the candidate is explicitly leaving behind.
 #
 # Example: "Director of Product - Ads Performance" contains the exec phrase
 # "director of product" which is in LEADERSHIP_EXCEPTIONS, but "ads
@@ -639,7 +609,7 @@ PRIORITY_DISQUALIFIERS: list[str] = [
 # wrong-FUNCTION-at-exec-level phrases that the generic
 # LEADERSHIP_WHITELIST_PATTERNS (bare \bvp\b / \bdirector\b / \bhead of\b)
 # must NOT rescue. Audit of the rescore found 86% of Haiku calls were
-# on jobs scoring <20 — a big chunk being exec titles in functions the original author will
+# on jobs scoring <20 — a big chunk being exec titles in functions the candidate will
 # never take (Finance Director, VP Sales, Director of Public Policy) that the
 # bare-leadership whitelist exempted straight into a wasted Haiku call. These
 # are matched with WORD BOUNDARIES (see algo_prefilter._NEVER_RESCUE_RE) so
@@ -678,7 +648,7 @@ WRONG_FUNCTION_EXEC_NEVER_RESCUE: list[str] = [
     # Customer success (wrong function per profile)
     "head of customer success", "vp of customer success",
     "director of customer success",
-    # Creative (the original author is technology, not creative — note: "design director"
+    # Creative (the candidate is technology, not creative — note: "design director"
     # is left in LEADERSHIP_EXCEPTIONS deliberately; only adding the clearly
     # non-tech creative execs here).
     "creative director", "chief creative", "art director",
@@ -692,8 +662,8 @@ WRONG_FUNCTION_EXEC_NEVER_RESCUE: list[str] = [
 # match no kill-keyword yet each cost a Haiku call to score ~0-15.
 #
 # This list powers a POSITIVE relevance gate (algo_prefilter.prefilter): a job
-# is skipped pre-Haiku ONLY if it has NONE of {known industry, dream company,
-# leadership title, a relevance noun in the TITLE}. A real the original author role always
+# is skipped pre-Haiku ONLY if it has NONE of {known industry, top-tier company,
+# leadership title, a relevance noun in the TITLE}. a real target role always
 # satisfies at least one — note "ai"/"platform"/"strategy"/"engineering" keep
 # the AI-platform lane (OpenAI/Anthropic roles) even though those companies
 # aren't in COMPANY_INDUSTRY_MAP. Matched WORD-BOUNDARY against the TITLE ONLY
@@ -707,17 +677,15 @@ TITLE_RELEVANCE_NOUNS: list[str] = [
     "technology", "engineering", "engineer", "platform", "infrastructure",
     "architect", "architecture", "technical", "software", "systems", "system",
     "devops", "cloud", "data", "developer", "development", "digital",
-    # online / live-services / gaming lane
+    # online / platform-services lane
     "online services", "online service", "live service", "live services",
-    "live ops", "multiplayer", "gaming", "game", "games", "studio", "esports",
-    "backend", "matchmaking",
+    "platform services", "backend", "distributed", "scalability",
     # role-shape lane
     "product", "strategy", "strategic", "operations", "operation", "analyst",
     "analytics", "advisor", "advisory", "interim", "fractional", "consultant",
     "consulting", "program", "transformation", "innovation",
-    # exec acronyms / passions (word-boundary matched, so safe)
-    "cto", "cio", "cpo", "sre", "ai", "ml", "immersive", "music", "audio",
-    "media",
+    # exec acronyms (word-boundary matched, so safe)
+    "cto", "cio", "cpo", "sre", "ai", "ml", "media",
 ]
 
 
@@ -751,7 +719,7 @@ DILUTING_PREFIXES: list[str] = [
 # 2) SOFT_WARNINGS — flag for Haiku, never auto-kill.
 # =============================================================================
 #
-# These are signals that would be wrong for SOME the original author-style roles but
+# These are signals that would be wrong for SOME the candidate-style roles but
 # right for others. Example: "temporary" is wrong for a full-time VP search,
 # but RIGHT for TRACK_2 interim/fractional CTO. Rather than hard-coding a
 # decision, we flag them as WARNINGS and let Haiku weigh them against the
@@ -775,7 +743,7 @@ SOFT_WARNING_TEMP_CONTRACT: list[str] = [
 
 
 # Titles that mention D2C / commerce / payments / ads explicitly in the
-# title. the original author is pivoting AWAY from this work but occasional cases are
+# title. the candidate is moving away from this work but occasional cases are
 # strategy-framed (e.g., "VP of D2C Strategy" at a legit company). Flag
 # and let Haiku decide.
 SOFT_WARNING_D2C_IN_TITLE: list[str] = [
@@ -815,7 +783,7 @@ SOFT_WARNING_CULTURE_REDFLAGS: list[str] = [
 ]
 
 
-# High-travel / RTO mandates. the original author has family commitments — heavy travel or
+# High-travel / RTO mandates. the candidate has family commitments — heavy travel or
 # 5-day-in-office is a practical constraint. Flag for Haiku (some VP roles
 # legitimately require it and have offsetting comp; some are deal-breakers).
 SOFT_WARNING_HIGH_TRAVEL: list[str] = [
@@ -830,7 +798,7 @@ SOFT_WARNING_RTO_MANDATE: list[str] = [
 
 
 # TPM (Technical Program Manager) titles. Used to be a hard
-# kill but the original author's audit caught senior-TPM roles at gaming dream-cos that
+# kill but the candidate's audit caught senior-TPM roles at top-tier target companies that
 # are legitimate cross-functional engineering-program leadership.
 # Flag, let Haiku weigh whether the JD reads like real program leadership
 # vs. the IC-coordinator flavor.
@@ -840,7 +808,7 @@ SOFT_WARNING_TPM: list[str] = [
 ]
 
 
-# Hands-on coding signals. the original author is NOT a coder. Most execs don't need to,
+# Hands-on coding signals. the candidate is not a hands-on engineer. Most execs don't need to,
 # but some startup CTO roles blur the line. Flag, don't kill.
 SOFT_WARNING_HANDS_ON_CODING: list[str] = [
     "hands-on coder", "write production code",
@@ -859,7 +827,7 @@ SOFT_WARNING_HANDS_ON_CODING: list[str] = [
 #
 # When any of these fire, the job is tagged with the category in its
 # `positive_signals` list. Used for:
-#   - Informing Haiku ("this role matched the original author's tcg_boardgame signals")
+#   - Informing Haiku ("this role matched the candidate's marketplace_interest signals")
 #   - Markdown export faceting ("here are the roles tagged ma_pmi")
 #   - UI filter chips
 #
@@ -867,148 +835,26 @@ SOFT_WARNING_HANDS_ON_CODING: list[str] = [
 # -----------------------------------------------------------------------------
 
 POSITIVE_SIGNALS: dict[str, list[str]] = {
-
-    # -- Role-shape positives — tech-strategy / architecture / M&A -----------
-
-    "strategy": [
-        "corporate strategy", "enterprise strategy", "strategic planning",
-        "strategy & operations", "strategy and operations", "chief of staff",
-        "vp analyst", "principal analyst", "industry analyst",
-        "market intelligence", "competitive intelligence", "research director",
-        "thought leadership", "advisory", "executive advisor",
-        "strategic advisor", "business transformation", "operating model",
-        "portfolio strategy", "growth strategy", "horizon planning",
-        "tech strategy", "technology strategy", "product strategy",
-        "go-to-market strategy", "platform strategy", "capability roadmap",
-    ],
-
-    "architecture": [
-        "technology program management", "tpm", "enterprise program",
-        "program director", "head of programs", "enterprise architecture",
-        "enterprise architect", "solutions architecture",
-        "technology architecture", "chief architect", "reference architecture",
-        "domain architecture", "capability model", "target state architecture",
-        "technology steering", "architecture review board", "arb",
-        "technology governance", "it governance", "platform strategy",
-        "technology roadmap", "program management office", "pmo",
-    ],
-
-    "ma_pmi": [
-        "m&a integration", "post-merger integration",
-        "post-acquisition integration", "pmi", "integration management office",
-        "imo lead", "carve-out", "divestiture", "day 1 readiness",
-        "synergy capture", "integration playbook", "deal integration",
-        "transaction advisory", "corporate development", "inorganic growth",
-        "technology due diligence", "tech dd", "acquisition integration",
-    ],
-
-    # -- Seniority positives — VP+ title markers ------------------------------
-
-    "senior_titles": [
-        "vice president", "vp", "svp", "senior vice president",
-        "evp", "executive vice president", "head of", "director",
-        "senior director", "principal", "distinguished", "fellow",
-        "practice lead", "managing director", "general manager",
-    ],
-
-    # -- Industry / passion positives -----------------------------------------
-
-    "gaming": [
-        "for the players", "games industry", "game development",
-        "game developer", "game studio", "game studios", "games studio",
-        "live service", "live services", "live ops", "live operations",
-        "player experience", "players and creators", "creators and players",
-        "creator economy", "creator platform", "developer community",
-        "game community", "gaming platform", "game platform", "game engine",
-        "unreal engine", "unity engine", "game services", "game production",
-        "multiplayer", "matchmaking", "mmo", "f2p", "free-to-play",
-        "battle pass", "battle royale", "esports", "competitive gaming",
-        "game design", "gameplay", "narrative", "intellectual property",
-        "franchise", "studio", "avatars", "virtual world", "virtual worlds",
-        "metaverse", "experiences on", "our platform reaches",
-        "monthly active users",
-    ],
-
-    "immersive": [
-        "immersive", "experiential", "location-based entertainment", "lbe",
-        "escape room", "themed entertainment", "installation", "exhibit",
-        "interactive experience", "virtual reality", "augmented reality",
-        "extended reality", "projection mapping", "dark ride", "attraction",
-        "guest experience", "visitor experience",
-    ],
-
-    "tcg_boardgame": [
-        "trading card game", "tcg", "ccg", "collectible card",
-        "deckbuilding", "board game", "tabletop", "strategy game",
-        "magic the gathering", "pokemon", "yu-gi-oh", "mtg",
-    ],
-
-    "music": [
-        "music", "musician", "artist", "daw", "audio", "sound design",
-        "live events", "concerts", "ticketing", "streaming audio",
-        "instrument", "producer", "songwriter", "label", "recording",
-    ],
-
-    # -- Mission positives — nonprofit / helping people -----------------------
-
-    "mission": [
-        "mission-driven", "making lives better", "helping people",
-        "social impact", "community impact", "serve our users",
-        "user well-being", "for the players", "accessibility",
-        "underrepresented", "mental health", "suicide prevention",
-        "crisis support", "nonprofit", "501(c)(3)", "social good",
-    ],
-
-    # -- Engagement positives — interim / fractional track --------------------
-
-    "interim": [
-        "interim", "fractional", "fractional cto", "fractional cio",
-        "contract", "contractor", "contract-to-hire", "1099",
-        "w2 contract", "consultant", "consulting engagement", "sow",
-        "statement of work", "project-based", "fixed-term", "ftc",
-        "temp-to-perm", "short-term assignment", "engagement", "advisor",
-        "advisory role", "board advisor", "6-month contract",
-        "12-month contract", "day rate", "hourly rate",
-    ],
-
-    # -- Cultural alignment positives — LGBTQ+ inclusion ----------------------
-
-    "lgbtq": [
-        "gender identity", "sexual orientation", "lgbtq+", "lgbtqia+",
-        "transgender", "non-binary", "pride erg", "out@", "spectrum erg",
-        "domestic partner benefits", "transgender-inclusive healthcare",
-        "gender-affirming care", "family-forming benefits",
-        "fertility benefits", "adoption assistance", "surrogacy benefits",
-        "equal parental leave", "gender-neutral parental leave", "pronouns",
-        "human rights campaign", "equality 100",
-        "best place to work for lgbtq",
-    ],
-
-    # -- Work-life positives (flag only — Haiku weighs) -----------------------
-
-    "family_friendly": [
-        "flexible schedule", "flexible hours", "family-friendly",
-        "parental leave", "paid parental leave", "caregiver leave",
-        "backup childcare", "work-life balance", "4-day work week",
-        "summer hours", "no weekend work",
-    ],
-
-    # -- Geography positives — NJ office means commutable from Anytown -
-
-    "nj_office": [
-        "jersey city", "hoboken", "Anytown", "parsippany",
-        "newark", "morristown", "short hills",
-    ],
-
-    # -- Rare-specialty positives — the original author's Take-Two / 2K Online heritage -----
-
-    "multiplayer_live_service": [
-        "multiplayer infrastructure", "multiplayer backend",
-        "live service", "live ops", "live operations", "online services",
-        "online services platform", "matchmaking", "concurrent players",
-        "game services", "platform engineering", "merchant of record",
-        "subscription platform", "post-merger integration", "shared services",
-    ],
+    # Generic professional signals (diagnostic only; NOT score math).
+    "strategy": ["strategy", "strategic", "roadmap", "vision", "go-to-market"],
+    "architecture": ["architecture", "platform design", "systems design",
+                     "technical strategy"],
+    "ma_pmi": ["m&a", "post-merger integration", "acquisition integration",
+               "due diligence"],
+    "distributed_systems": ["distributed systems", "high availability",
+                            "live service", "scalability", "real-time systems"],
+    "domain_interest": ["consumer product", "platform product", "developer platform"],
+    "experiential_interest": ["experiential", "location-based", "physical product"],
+    "creator_interest": ["creator economy", "content tools", "media tooling"],
+    "marketplace_interest": ["marketplace", "two-sided", "ecommerce"],
+    "mission": ["mission-driven", "social impact", "public benefit", "nonprofit"],
+    "interim": ["interim", "fractional", "advisory", "consulting"],
+    "lgbtq": ["lgbtq", "inclusive", "diversity"],
+    "family_friendly": ["family friendly", "work-life balance", "parental leave"],
+    "local_metro": [],
+    # senior_titles is referenced by literal in algo_prefilter — keep this key.
+    "senior_titles": ["vp", "vice president", "head of", "director", "chief",
+                      "principal", "senior director"],
 }
 
 
@@ -1024,168 +870,45 @@ POSITIVE_SIGNALS: dict[str, list[str]] = {
 # Bucket scores (0-10). Not score-math anymore — kept for sorting / UI
 # facets and the `industry_score` diagnostic field.
 INDUSTRY_SCORES: dict[str, int] = {
-    "gaming_publisher_platform":      10,
-    "digital_tcg_ccg":                10,
-    "immersive_lbe":                   9,
-    "gaming_b2b_infrastructure":       9,
-    "ai_infrastructure":               8,
-    "music_tech":                      8,
-    "gaming_accessibility_nonprofit":  8,
-    "streaming_media":                 7,
-    "analyst_firm":                    7,
-    "gaming_vc_pe_operating":          7,
-    "sports_betting_tech":             6,
-    "science_education_nonprofit":     6,
-    "hospitality_tech":                5,
-    "defense_simulation":              4,
-    "general_enterprise_tech":         3,
-    "adtech_martech":                  2,
-    "crypto_web3":                     1,
+    "consumer_platform":        10,
+    "ai_infrastructure":         9,
+    "platform_infra":            9,
+    "consumer_marketplace":      8,
+    "creator_tech":              8,
+    "experiential_venue":        7,
+    "media_streaming":           7,
+    "analyst_firm":              7,
+    "vc_pe_operating":           6,
+    "accessibility_nonprofit":   6,
+    "education_nonprofit":       6,
+    "transaction_platform":      5,
+    "hospitality_tech":          5,
+    "simulation_tech":           4,
+    "general_enterprise_tech":   3,
+    "adtech_martech":            2,
+    "crypto_web3":               1,
 }
 
 
 # Known company → industry bucket mapping (lowercased, suffix-stripped).
 COMPANY_INDUSTRY_MAP: dict[str, str] = {
-    # Gaming publishers / platforms
-    "riot games": "gaming_publisher_platform",
-    "roblox": "gaming_publisher_platform",
-    "epic games": "gaming_publisher_platform",
-    "blizzard entertainment": "gaming_publisher_platform",
-    "avalanche studios": "gaming_publisher_platform",
-    "microsoft gaming": "gaming_publisher_platform",
-    "xbox": "gaming_publisher_platform",
-    "nintendo of america": "gaming_publisher_platform",
-    "sony interactive entertainment": "gaming_publisher_platform",
-    "electronic arts": "gaming_publisher_platform",
-    "ea": "gaming_publisher_platform",
-    "activision blizzard": "gaming_publisher_platform",
-    "take-two interactive": "gaming_publisher_platform",
-    "2k games": "gaming_publisher_platform",
-    "ubisoft": "gaming_publisher_platform",
-    "bungie": "gaming_publisher_platform",
-    "naughty dog": "gaming_publisher_platform",
-    "respawn entertainment": "gaming_publisher_platform",
-    "crystal dynamics": "gaming_publisher_platform",
-    "rockstar games": "gaming_publisher_platform",
-    # Gaming B2B infra
-    "unity": "gaming_b2b_infrastructure",
-    "unity technologies": "gaming_b2b_infrastructure",
-    "accelbyte": "gaming_b2b_infrastructure",
-    "pragma": "gaming_b2b_infrastructure",
-    "heroic labs": "gaming_b2b_infrastructure",
-    "beamable": "gaming_b2b_infrastructure",
-    "gameanalytics": "gaming_b2b_infrastructure",
-    "edgegap": "gaming_b2b_infrastructure",
-    # AI infrastructure / frontier-AI / AI dev-tools.
-    # the original author's #1 current lane. Mapped so the relevance gate keeps even
-    # cryptic-title roles (e.g. "VoiceAI" @ LiveKit, "Performance Modeling
-    # Lead" @ OpenAI) that carry no relevance noun in the title. Score 8
-    # (strong, not dream-tier-9) so they don't trip watchlist_dream.
+    # AI infrastructure (generic public AI / ML platform companies)
     "openai": "ai_infrastructure",
     "anthropic": "ai_infrastructure",
     "nvidia": "ai_infrastructure",
     "databricks": "ai_infrastructure",
-    "datadog": "ai_infrastructure",
     "hugging face": "ai_infrastructure",
-    "huggingface": "ai_infrastructure",
-    "scale ai": "ai_infrastructure",
-    "together ai": "ai_infrastructure",
-    "fal": "ai_infrastructure",
-    "fal.ai": "ai_infrastructure",
-    "baseten": "ai_infrastructure",
-    "baseten labs": "ai_infrastructure",
-    "modal": "ai_infrastructure",
-    "modal labs": "ai_infrastructure",
-    "replicate": "ai_infrastructure",
-    "livekit": "ai_infrastructure",
-    "e2b": "ai_infrastructure",
-    "coder": "ai_infrastructure",
-    "cohere": "ai_infrastructure",
-    "mistral ai": "ai_infrastructure",
-    "perplexity": "ai_infrastructure",
-    "perplexity ai": "ai_infrastructure",
-    "pinecone": "ai_infrastructure",
-    "weaviate": "ai_infrastructure",
-    "langchain": "ai_infrastructure",
-    "groq": "ai_infrastructure",
-    "cerebras": "ai_infrastructure",
-    "lambda labs": "ai_infrastructure",
-    "coreweave": "ai_infrastructure",
-    "runpod": "ai_infrastructure",
-    "crusoe": "ai_infrastructure",
-    # TCG / CCG
-    "wizards of the coast": "digital_tcg_ccg",
-    "pokemon company": "digital_tcg_ccg",
-    "upper deck": "digital_tcg_ccg",
-    # Immersive / LBE
-    "meow wolf": "immersive_lbe",
-    "figure8": "immersive_lbe",
-    "museum of ice cream": "immersive_lbe",
-    "five iron golf": "immersive_lbe",
-    "activate": "immersive_lbe",
-    "sandbox vr": "immersive_lbe",
-    "cosm": "immersive_lbe",
-    "puttshack": "immersive_lbe",
-    "level99": "immersive_lbe",
-    "immersive gamebox": "immersive_lbe",
-    "dreamscape": "immersive_lbe",
-    # Music
-    "spotify": "music_tech",
-    "splice": "music_tech",
-    "ableton": "music_tech",
-    "native instruments": "music_tech",
-    "fender digital": "music_tech",
-    "audiokinetic": "music_tech",
-    "seatgeek": "music_tech",
-    "live nation": "music_tech",
-    "ticketmaster": "music_tech",
-    # Streaming / media
-    "disney": "streaming_media",
-    "nbcuniversal": "streaming_media",
-    "paramount": "streaming_media",
-    "paramount pictures": "streaming_media",
-    "paramount global": "streaming_media",
-    "dolby": "streaming_media",
-    "dolby laboratories": "streaming_media",
-    "warner bros discovery": "streaming_media",
-    "espn": "streaming_media",
-    "apple": "streaming_media",
-    "netflix": "streaming_media",
-    # Analyst firms
+    # Consumer platforms / developer platforms (replace with your targets)
+    "example-platform-co": "consumer_platform",
+    "example-devtools-co": "platform_infra",
+    # Analyst / research firms
     "gartner": "analyst_firm",
     "forrester": "analyst_firm",
-    "idc": "analyst_firm",
-    "omdia": "analyst_firm",
-    # Sports betting / iGaming
-    "draftkings": "sports_betting_tech",
-    "fanduel": "sports_betting_tech",
-    "betmgm": "sports_betting_tech",
-    "bet365": "sports_betting_tech",
-    "caesars digital": "sports_betting_tech",
-    "pointsbet": "sports_betting_tech",
-    "underdog fantasy": "sports_betting_tech",
-    "prizepicks": "sports_betting_tech",
-    # Hospitality tech
-    "sevenrooms": "hospitality_tech",
-    "resy": "hospitality_tech",
-    "opentable": "hospitality_tech",
-    "bentobox": "hospitality_tech",
-    "toast": "hospitality_tech",
-    # Science / education nonprofit
-    "liberty science center": "science_education_nonprofit",
-    "american museum of natural history": "science_education_nonprofit",
-    "intrepid museum": "science_education_nonprofit",
-    # Gaming accessibility / mission
-    "games for change": "gaming_accessibility_nonprofit",
-    "ablegamers": "gaming_accessibility_nonprofit",
-    "deepwell dtx": "gaming_accessibility_nonprofit",
-    # Defense / sim
-    "anduril": "defense_simulation",
-    "shield ai": "defense_simulation",
-    # Gaming VC / PE
-    "bitkraft ventures": "gaming_vc_pe_operating",
-    "griffin gaming partners": "gaming_vc_pe_operating",
-    "konvoy": "gaming_vc_pe_operating",
+    # Enterprise software
+    "example-enterprise-co": "general_enterprise_tech",
+    # Marketplaces / media (generic placeholders)
+    "example-marketplace-co": "consumer_marketplace",
+    "example-media-co": "media_streaming",
 }
 
 
@@ -1193,60 +916,21 @@ COMPANY_INDUSTRY_MAP: dict[str, str] = {
 # run keyword match against lowercased title+company+description.
 # First bucket whose keywords hit wins.
 INDUSTRY_KEYWORDS: dict[str, list[str]] = {
-    "gaming_publisher_platform": [
-        "game studio", "video game", "mobile game", "gaming platform",
-        "console game", "esports", "live service game", "free-to-play",
-        "battle pass",
-    ],
-    "digital_tcg_ccg": [
-        "trading card game", "tcg", "ccg", "collectible card", "deckbuilding",
-    ],
-    "immersive_lbe": [
-        "immersive entertainment", "location-based entertainment", "lbe",
-        "themed entertainment", "escape room", "experiential venue",
-        "dark ride", "attraction operator",
-    ],
-    "gaming_b2b_infrastructure": [
-        "game backend", "gaming infrastructure", "gaming sdk",
-        "game platform services", "matchmaking service", "game server",
-    ],
-    "ai_infrastructure": [
-        "ai infrastructure", "inference platform", "model serving", "llmops",
-        "mlops platform", "foundation model", "frontier ai", "llm infrastructure",
-        "ai developer platform", "agentic ai platform", "gpu cloud",
-        "ml platform team", "ai platform team",
-    ],
-    "music_tech": [
-        "music technology", "music platform", "audio technology",
-        "music streaming", "live events platform", "ticketing platform",
-    ],
-    "sports_betting_tech": [
-        "sports betting", "sportsbook", "igaming", "online gambling",
-        "wagering", "fantasy sports", "daily fantasy",
-    ],
-    "streaming_media": [
-        "streaming media", "sports media", "broadcast", "media company",
-        "digital media", "content platform",
-    ],
-    "analyst_firm": [
-        "research firm", "analyst firm", "market research",
-        "industry analyst", "advisory firm",
-    ],
-    "gaming_accessibility_nonprofit": [
-        "gaming nonprofit", "games for health", "digital therapeutics",
-        "game-based learning", "games and mental health",
-    ],
-    "hospitality_tech": [
-        "hospitality technology", "restaurant technology",
-        "restaurant platform", "hotel technology", "foodservice technology",
-    ],
-    "science_education_nonprofit": [
-        "science museum", "natural history", "education nonprofit",
-        "cultural institution",
-    ],
-    "crypto_web3": [
-        "web3", "blockchain", "cryptocurrency", "defi", "nft", "crypto",
-    ],
+    "consumer_platform": ["consumer platform", "consumer product", "platform company"],
+    "ai_infrastructure": ["ai infrastructure", "inference platform", "model serving",
+                          "llmops", "mlops platform", "foundation model", "ml platform team"],
+    "platform_infra": ["platform infrastructure", "developer platform",
+                       "backend platform", "platform services"],
+    "consumer_marketplace": ["marketplace", "two-sided marketplace", "ecommerce platform"],
+    "creator_tech": ["creator platform", "creator tools", "content platform"],
+    "experiential_venue": ["experiential venue", "location-based experience",
+                           "attraction operator"],
+    "media_streaming": ["streaming media", "media company", "content streaming"],
+    "analyst_firm": ["research firm", "analyst firm", "market research", "advisory firm"],
+    "transaction_platform": ["payments platform", "transaction platform", "fintech platform"],
+    "hospitality_tech": ["hospitality technology", "restaurant technology", "hotel technology"],
+    "education_nonprofit": ["education nonprofit", "cultural institution", "museum"],
+    "crypto_web3": ["web3", "blockchain", "cryptocurrency", "defi", "crypto"],
 }
 
 
@@ -1257,34 +941,29 @@ INDUSTRY_KEYWORDS: dict[str, list[str]] = {
 # HRC Corporate Equality Index 100 (2025/2026). Roles at these companies
 # get an HRC positive-signal flag surfaced to Haiku + UI.
 HRC100_COMPANIES: list[str] = [
-    "apple", "microsoft", "google", "meta", "amazon", "netflix", "spotify",
-    "adobe", "salesforce", "ibm", "intel", "oracle", "cisco", "nvidia",
-    "qualcomm", "the walt disney company", "disney", "nbcuniversal",
-    "warner bros discovery", "paramount global", "paramount",
-    "sony interactive entertainment", "sony pictures", "electronic arts",
-    "activision blizzard", "riot games", "take-two interactive", "ubisoft",
-    "nintendo of america", "zynga", "uber", "lyft", "airbnb", "linkedin",
-    "pinterest", "ebay", "paypal", "american express", "jpmorgan chase",
-    "goldman sachs", "mastercard", "visa", "target", "nike", "servicenow",
-    "workday", "atlassian", "zoom", "dropbox", "twilio", "snap", "dolby",
+    # Example set of large public employers with strong inclusion ratings.
+    # Replace with the companies you want flagged (e.g. from a public
+    # corporate-equality index). Kept generic so no personal-interest or
+    # prior-employer signal leaks through.
+    "apple", "microsoft", "google", "salesforce", "ibm", "intel",
+    "adobe", "cisco", "accenture", "dell", "hp", "mastercard",
+    "american express", "target", "nike", "linkedin",
 ]
 
 
 # Companies with documented crunch culture. Flag for Haiku — depending on
 # role seniority the crunch exposure varies, so we don't auto-penalize.
 CRUNCH_COMPANIES: list[str] = [
-    "rockstar games", "take-two interactive", "cd projekt red",
-    "activision", "blizzard", "electronic arts", "bioware", "naughty dog",
-    "rocksteady studios", "ubisoft", "treyarch", "quantic dream",
-    "netherealm studios", "bungie", "crystal dynamics",
-    "respawn entertainment",
+    # Companies with documented crunch culture. Replace with your own list.
+    "example-crunch-co-a", "example-crunch-co-b",
 ]
 
 
 # Crunch-reformed companies — same flag, but Haiku prompt notes that
 # public reform reporting exists. Currently just Riot (2019+ reforms).
 CRUNCH_REDUCED_PENALTY_COMPANIES: list[str] = [
-    "riot games",
+    # Companies that reportedly reformed crunch culture (reduced penalty).
+    "example-reformed-co",
 ]
 
 
@@ -1292,21 +971,18 @@ CRUNCH_REDUCED_PENALTY_COMPANIES: list[str] = [
 # Location / commute (preserved from config/scoring.yaml).
 # =============================================================================
 #
-# the original author lives in Anytown NJ with family commitments — commute distance is
+# the candidate lives in the candidate's home town NJ with family commitments — commute distance is
 # a practical constraint, not a preference. These lists feed into the
 # prefilter's geography flag generation (remote / nyc_commutable /
-# nj_office / out_of_area).
+# local_metro / out_of_area).
 # -----------------------------------------------------------------------------
 
-# City names that are commutable from Anytown via car or NJT/PATH.
+# City names that are commutable from the candidate's home town via car or NJT/PATH.
 # Used for substring match against location fields.
 COMMUTE_CITIES: list[str] = [
-    # NYC boroughs + target neighborhoods
-    "new york", "nyc", "manhattan", "brooklyn", "queens",
-    "tribeca", "midtown", "soho", "flatiron", "hudson yards",
-    # NJ commute zone
-    "jersey city", "hoboken", "newark", "parsippany",
-    "morristown", "Anytown", "short hills",
+    # Towns/zones commutable from the candidate's home base.
+    # Replace with your own geography.
+    "example-home-city", "example-home-suburb", "example-regional-hub",
 ]
 
 
@@ -1314,42 +990,30 @@ COMMUTE_CITIES: list[str] = [
 # prefilter compiles them. Ported verbatim from config/scoring.yaml under
 # `location.*`.
 LOCATION_PATTERNS: dict[str, list[str]] = {
-    "remote_us": [
-        r"(?i)\b(fully|100%|completely)?\s*remote\b",
-        r"(?i)\bwork from anywhere\b",
-        r"(?i)\bremote-first\b",
-        r"(?i)\bremote[ -]friendly\b",
-        r"(?i)\bdistributed team\b",
-        r"(?i)\bUS remote\b",
-        r"(?i)\bremote \(US\)\b",
-        r"(?i)\banywhere in the (US|United States)\b",
-    ],
-    "nyc_metro": [
-        r"(?i)\bhybrid\b.*\b(NYC|New York|Manhattan)\b",
-        r"(?i)\b(NYC|New York)\b.*\bhybrid\b",
-        r"(?i)\b[23]\s*days?\s*(in\s*office|in-office|onsite|on-site)\b",
-        r"(?i)\bNew York,? NY\b",
-        r"(?i)\bNYC[ -]based\b",
-        r"(?i)\b(Tribeca|Midtown|SoHo|Flatiron|Hudson Yards|Brooklyn)\b",
-        r"(?i)\b(Jersey City|Hoboken|Anytown|Morristown|Parsippany)\b",
-    ],
-    "nj_office": [
-        r"(?i)\b(Jersey City|Hoboken|Hoboken NJ|Newark NJ|Parsippany|Morristown|Anytown|Short Hills)\b",
-    ],
-    "out_of_area": [
-        r"(?i)\bon[- ]site.*(Seattle|Redmond|Bellevue|San Francisco|SF|Bay Area|Los Angeles|LA|Austin|Boston|Cupertino|Mountain View)\b",
-        r"(?i)\b(Seattle|Redmond|San Francisco|Los Angeles|Austin|Boston|Cupertino).*\b(in[- ]office|on[- ]site|5 days)\b",
-        r"(?i)\brelocation (required|assistance|package)\b",
-        r"(?i)\bwillingness? to relocate\b",
-        r"(?i)\bmust relocate\b",
-        r"(?i)\bon[- ]site in (Seattle|Redmond|Cupertino|Mountain View|Austin|San Francisco|Los Angeles)\b",
-    ],
+    # heavy_office: strong in-office / RTO signals (deal-breaker)
     "heavy_office": [
-        r"(?i)\bin[- ]office (5|five) days\b",
-        r"(?i)\bfully on-?site\b",
-        r"(?i)\b100% (on-?site|in office)\b",
-        r"(?i)\bno remote\b",
-        r"(?i)\bRTO mandate\b",
+        r"5 days (?:a week )?in (?:the )?office", r"in-?office (?:5|five) days",
+        r"full-time in office", r"on-?site only", r"100% in office",
+    ],
+    # out_of_area: locations outside the commute radius (deal-breaker).
+    # Replace with the metros that are NOT commutable for you.
+    "out_of_area": [
+        r"\bexample-far-city-a\b", r"\bexample-far-city-b\b",
+        r"\bexample-far-region\b",
+    ],
+    # local_metro: commutable home metro (best case). Replace with your city.
+    "local_metro": [
+        r"\bexample-home-city\b", r"\bexample-home-suburb\b",
+    ],
+    # regional_metro: hybrid-commutable regional hub (good).
+    "regional_metro": [
+        r"\bexample-regional-hub\b", r"\bexample-metro-area\b",
+    ],
+    # remote_us: remote roles open to US-based candidates (referenced by
+    # literal in algo_prefilter — keep this key). Generic patterns.
+    "remote_us": [
+        r"\bremote\b", r"remote[, -]+us\b", r"remote[, -]+united states",
+        r"work from home", r"\bwfh\b", r"fully remote", r"remote-first",
     ],
 }
 
@@ -1390,7 +1054,7 @@ COMP_THRESHOLDS: dict[str, float] = {
 #   T2_APPLY_2WK          semantic >= 65   ("Apply within 2 weeks")
 #   T3_MONITOR            semantic >= 50   ("Monitor, apply selectively")
 #   WATCHLIST             semantic >= 35   ("Re-evaluate monthly")
-#   WATCHLIST_DREAM       flag-based       (dream-co + industry + level, any semantic)
+#   WATCHLIST_DREAM       flag-based       (top-tier companies + industry + level, any semantic)
 #   SKIP                  semantic <  35
 #   NEEDS_REVIEW          Haiku errored or quota exhausted — do NOT auto-skip
 # -----------------------------------------------------------------------------
@@ -1408,17 +1072,16 @@ TIER_THRESHOLDS: dict[str, int] = {
 # =============================================================================
 # Track labels (orthogonal to tier — which "lane" is this role in?)
 # =============================================================================
-# Preserved. Still used — the original author's three-track job-search model.
+# Preserved. Still used — the candidate's three-track job-search model.
 #
 #   TRACK_1_FULLTIME    default fulltime exec role
 #   TRACK_2_INTERIM     interim / fractional / contract (POSITIVE_SIGNALS.interim)
-#   TRACK_3_PIVOT       passion / career-pivot (gaming/tcg/music/immersive/
+#   TRACK_3_PIVOT       passion / career-pivot (the pivot/passion industries/
 #                       nonprofit industries)
 # -----------------------------------------------------------------------------
 
-TRACK_3_PIVOT_INDUSTRIES: list[str] = [
-    "immersive_lbe",
-    "digital_tcg_ccg",
-    "music_tech",
-    "gaming_accessibility_nonprofit",
-]
+TRACK_3_PIVOT_INDUSTRIES = {
+    # Industries treated as a "pivot/stretch" track for ranking purposes.
+    "media_streaming", "transaction_platform", "adtech_martech",
+    "general_enterprise_tech", "hospitality_tech",
+}

@@ -1408,7 +1408,7 @@ body.browse-page nav.bottom-nav { display: none; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Condensed job list rows — rendered by common.renderJobRow on any
+/* Condensed job list rows — rendered by common.renderJobRow() on any
    page that wants a compact link list instead of the full job card
    (currently unused in the browse page, but still reachable). */
 .job-row {

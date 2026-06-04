@@ -51,13 +51,13 @@ def handler(event, context):
         # Fall back to the resolved identity source if the gateway provided
         # it that way (single configured header source -> one value, possibly
         # comma-joined like the header above).
-        ident = event.get("identitySource") or 
+        ident = event.get("identitySource") or []
         raw = ident[0] if ident else ""
 
     authorized = False
     if expected:
         for candidate in str(raw or "").split(","):
-            if hmac.compare_digest(candidate.strip, expected):
+            if hmac.compare_digest(candidate.strip(), expected):
                 authorized = True
                 break
 

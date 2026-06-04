@@ -11,7 +11,7 @@ Two invocation paths:
      -> invoke ScrapeWorkerFn for that source asynchronously, return 202.
 
 Async invocation (`InvocationType=Event`) means the dispatcher returns
-in milliseconds without waiting for scrape_run to complete. Each
+in milliseconds without waiting for scrape_run() to complete. Each
 worker logs to its own CloudWatch stream and writes its own ScrapeRuns
 row, so observability isn't compromised.
 """
@@ -29,7 +29,7 @@ _WORKER_FN = os.environ.get("SCRAPE_WORKER_FN_NAME")
 _lambda = None
 
 
-def _client:
+def _client():
     """Lazy boto3 client (faster cold starts when only the manual path
     fires and we never reach this code)."""
     global _lambda
@@ -42,7 +42,7 @@ def _invoke_worker(source: str) -> None:
     """Fire-and-forget invoke of ScrapeWorkerFn for one source."""
     if not _WORKER_FN:
         raise RuntimeError("SCRAPE_WORKER_FN_NAME env var not set")
-    _client.invoke(
+    _client().invoke(
         FunctionName=_WORKER_FN,
         InvocationType="Event",         # async; do not wait for response
         Payload=json.dumps({"source": source}).encode("utf-8"),
@@ -72,14 +72,14 @@ def handler(event, context):
         return _json(202, {"ok": True, "invoked": source})
 
     # ---- Scheduled fan-out path -----------------------------------------
-    sources = event.get("sources") or 
+    sources = event.get("sources") or []
     if not isinstance(sources, list):
         # kwarg name avoids collision with the logger's positional `event` param.
         log.error("dispatcher_bad_event", payload=event)
         return {"ok": False, "error": "event.sources must be a list"}
 
-    invoked: list[str] = 
-    failed: list[dict] = 
+    invoked: list[str] = []
+    failed: list[dict] = []
     for source in sources:
         try:
             _invoke_worker(source)

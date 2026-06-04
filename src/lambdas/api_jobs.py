@@ -126,9 +126,9 @@ def _list(event) -> dict:
 
 def _csv(qs: dict, key: str) -> list:
     """Parse a comma-separated query-string value into a stripped list.
-    Returns  for missing / empty / whitespace-only."""
+    Returns [] for missing / empty / whitespace-only."""
     raw = (qs or {}).get(key, "") or ""
-    return [v.strip for v in raw.split(",") if v.strip]
+    return [v.strip() for v in raw.split(",") if v.strip()]
 
 
 def _int(qs: dict, key: str, default: int = 0, lo: Optional[int] = None,
@@ -154,7 +154,7 @@ def _browse(event) -> dict:
     # Free-text search (server-side, replaces the broken
     # client-side substring filter that only saw the loaded page).
     # Strip whitespace; treat empty string as "no search".
-    q = (qs.get("q") or "").strip or None
+    q = (qs.get("q") or "").strip() or None
 
     # Filters (all multi-value lists).
     industries       = _csv(qs, "industries")
@@ -172,7 +172,7 @@ def _browse(event) -> dict:
 
     # dedup by (company, title), default ON. Pass dedup=false
     # to disable (debug / inventory views).
-    dedup_raw = (qs.get("dedup") or "true").strip.lower
+    dedup_raw = (qs.get("dedup") or "true").strip().lower()
     dedup = dedup_raw not in ("false", "0", "no", "off")
 
     # Sort.
@@ -182,8 +182,8 @@ def _browse(event) -> dict:
     # still *accept* sort_by=semantic from any old client / bookmark that
     # still sends it, by coercing it to `score` here. That keeps bookmarks
     # and saved-search URLs from 400-ing.
-    sort_by  = (qs.get("sort_by")  or "score").lower
-    sort_dir = (qs.get("sort_dir") or "desc").lower
+    sort_by  = (qs.get("sort_by")  or "score").lower()
+    sort_dir = (qs.get("sort_dir") or "desc").lower()
     if sort_by == "semantic":
         sort_by = "score"
     # `company_asc` / `company_desc` group rows by company name
@@ -256,21 +256,21 @@ def _taxonomy(event) -> dict:
     """Return the facet labels for filter chips. Always 200, no filters."""
     industries = [
         {"value": k, "label": v.get("label", k)}
-        for k, v in INDUSTRIES_CFG.items
+        for k, v in INDUSTRIES_CFG.items()
     ]
     role_types = [
         {"value": k, "label": v.get("label", k)}
-        for k, v in ROLE_TYPES_CFG.items
+        for k, v in ROLE_TYPES_CFG.items()
     ]
     # Tier groups are derived from companies.yaml; YAML-defined company
     # groups come second in the chip rail.
-    tier_g = _tier_groups
-    company_groups = 
+    tier_g = _tier_groups()
+    company_groups = []
     for tier_key, label in (("tier_s", "Tier S"), ("tier_1", "Tier 1"),
                             ("tier_2", "Tier 2")):
         if tier_g.get(tier_key):
             company_groups.append({"value": tier_key, "label": label})
-    for k, v in COMPANY_GROUPS_CFG.items:
+    for k, v in COMPANY_GROUPS_CFG.items():
         company_groups.append({"value": k, "label": v.get("label", k)})
 
     return _json(200, {
@@ -351,7 +351,7 @@ def _action(event) -> dict:
     if action not in _ACTION_TO_STATUS:
         return _json(400, {
             "error": "invalid action",
-            "valid": sorted(_ACTION_TO_STATUS.keys),
+            "valid": sorted(_ACTION_TO_STATUS.keys()),
         })
     if not _notes_ok(notes):
         return _json(400, {"error": "notes too long", "max_chars": _MAX_NOTES_CHARS})
@@ -407,20 +407,20 @@ def _bulk_action(event) -> dict:
     if action not in _ACTION_TO_STATUS:
         return _json(400, {
             "error": "invalid action",
-            "valid": sorted(_ACTION_TO_STATUS.keys),
+            "valid": sorted(_ACTION_TO_STATUS.keys()),
         })
 
-    raw_ids = body.get("job_ids") or 
+    raw_ids = body.get("job_ids") or []
     if not isinstance(raw_ids, list):
         return _json(400, {"error": "job_ids must be a list"})
 
     # De-dupe + drop blanks/non-strings up front; cap at the per-call max.
-    seen: set = set
-    job_ids: list = 
+    seen: set = set()
+    job_ids: list = []
     for jid in raw_ids:
         if not isinstance(jid, str):
             continue
-        jid = jid.strip
+        jid = jid.strip()
         if not jid or jid in seen:
             continue
         seen.add(jid)

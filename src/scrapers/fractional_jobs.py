@@ -16,7 +16,7 @@ Defensive parsing strategy:
     <p> with class containing "company".
   * Location/remote is a third short text snippet.
 
-If selectors stop matching, parse returns None per row and the source
+If selectors stop matching, parse() returns None per row and the source
 silently produces 0 jobs that day. The base scraper logs that as a
 "partial" run and we'll see it on health.html.
 """
@@ -36,10 +36,10 @@ _WHITESPACE_RE = re.compile(r"\s+")
 
 
 def _clean(s: str) -> str:
-    """Normalize whitespace; bs4 leaves runs of \\n and tabs in get_text."""
+    """Normalize whitespace; bs4 leaves runs of \\n and tabs in get_text()."""
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 @register("fractional_jobs")
@@ -48,7 +48,7 @@ class FractionalJobsScraper(BaseScraper):
     schedule = "cron(30 6 * * ? *)"      # 06:30 UTC daily
     rate_limit_rps = 1.0
     # 2026-06-03: detail-page descriptions (the listing/card omits the JD).
-    # scrape_run fetches RawJob.url + extracts JSON-LD first, then this
+    # scrape_run() fetches RawJob.url + extracts JSON-LD first, then this
     # CSS selector; populates QoL keyword scoring + the semantic pass.
     auto_fetch_description = True
     _DESC_SELECTOR = 'main'
@@ -64,7 +64,7 @@ class FractionalJobsScraper(BaseScraper):
     def fetch(self) -> Iterable[dict]:
         # Single GET — listing page is a flat list, no pagination today.
         # If they add pagination later we'll add a loop here.
-        self._throttle
+        self._throttle()
         resp = requests.get(
             self.LIST_URL,
             headers={
@@ -73,15 +73,15 @@ class FractionalJobsScraper(BaseScraper):
             },
             timeout=30,
         )
-        resp.raise_for_status
+        resp.raise_for_status()
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
         # Job cards are <a> tags with hrefs starting "/jobs/" — but the
         # anchor itself is EMPTY on Fractional Jobs (Webflow site pattern).
         # The actual card content lives in a sibling/ancestor div with
-        # class "job-item". Walk up to that ancestor for parse to use.
-        seen_hrefs: set[str] = set
+        # class "job-item". Walk up to that ancestor for parse() to use.
+        seen_hrefs: set[str] = set()
         for anchor in soup.find_all("a", href=True):
             href = anchor["href"]
             if not href.startswith("/jobs/") or href == "/jobs":
@@ -139,7 +139,7 @@ class FractionalJobsScraper(BaseScraper):
         if more_info:
             text = _clean(more_info.get_text(" | ", strip=True))
             # Split on " | " — last token is typically the location.
-            parts = [p.strip for p in re.split(r"\|", text) if p.strip]
+            parts = [p.strip() for p in re.split(r"\|", text) if p.strip()]
             if parts:
                 location = parts[-1]
 
@@ -158,8 +158,8 @@ class FractionalJobsScraper(BaseScraper):
                 if not text or text == title or len(text) > 80:
                     continue
                 looks_like_location = (
-                    "remote" in text.lower
-                    or "anywhere" in text.lower
+                    "remote" in text.lower()
+                    or "anywhere" in text.lower()
                     or re.search(r",\s*[A-Z]{2}\b", text)
                 )
                 if looks_like_location and not location:
@@ -181,7 +181,7 @@ class FractionalJobsScraper(BaseScraper):
         # remote inference from the location string.
         remote = None
         if location:
-            lower = location.lower
+            lower = location.lower()
             if "remote" in lower or "anywhere" in lower:
                 remote = True
             elif "onsite" in lower or "on-site" in lower:

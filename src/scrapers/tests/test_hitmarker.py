@@ -1,4 +1,4 @@
-"""Tests for src/scrapers/hitmarker.py — parse against fixture HTML."""
+"""Tests for src/scrapers/hitmarker.py — parse() against fixture HTML."""
 from scrapers.hitmarker import HitmarkerScraper
 
 
@@ -42,9 +42,9 @@ def _payload(html: str = _CARD_HTML, href: str = "/jobs/vp-platform-eng-acme"):
     }
 
 
-def test_parse_uses_logo_alt_for_company:
-    s   = HitmarkerScraper
-    raw = s.parse(_payload)
+def test_parse_uses_logo_alt_for_company():
+    s   = HitmarkerScraper()
+    raw = s.parse(_payload())
     assert raw is not None
     assert raw.company   == "Acme Corp"
     assert raw.title     == "VP, Platform Engineering"
@@ -52,8 +52,8 @@ def test_parse_uses_logo_alt_for_company:
     assert raw.native_id == "vp-platform-eng-acme"
 
 
-def test_parse_remote_inferred:
-    s   = HitmarkerScraper
+def test_parse_remote_inferred():
+    s   = HitmarkerScraper()
     raw = s.parse(_payload(html=_CARD_HTML_REMOTE,
                             href="/jobs/director-of-eng-example"))
     assert raw is not None
@@ -61,9 +61,9 @@ def test_parse_remote_inferred:
     assert raw.remote is True
 
 
-def test_parse_falls_back_when_no_logo:
+def test_parse_falls_back_when_no_logo():
     """Without a logo alt, the first short text node = company."""
-    s   = HitmarkerScraper
+    s   = HitmarkerScraper()
     raw = s.parse(_payload(html=_CARD_HTML_NO_LOGO,
                             href="/jobs/game-director-example"))
     assert raw is not None
@@ -71,14 +71,14 @@ def test_parse_falls_back_when_no_logo:
     assert raw.location == "Bellevue, WA"
 
 
-def test_parse_skips_when_no_title:
-    s = HitmarkerScraper
+def test_parse_skips_when_no_title():
+    s = HitmarkerScraper()
     assert s.parse(_payload(html=_CARD_HTML_NO_TITLE,
                              href="/jobs/no-title")) is None
 
 
-def test_parse_skips_when_href_missing:
-    s = HitmarkerScraper
+def test_parse_skips_when_href_missing():
+    s = HitmarkerScraper()
     assert s.parse({"_href": "", "_url": "", "_html": _CARD_HTML}) is None
 
 
@@ -102,9 +102,9 @@ _LIVE_CARD_HTML = """
 """
 
 
-def test_parse_live_hitmarker_card_shape:
+def test_parse_live_hitmarker_card_shape():
     """Locked-in fixture from a real 2026-04 listing payload."""
-    s = HitmarkerScraper
+    s = HitmarkerScraper()
     raw = s.parse({
         "_href": "https://hitmarker.net/jobs/example-tech-project-manager-1688679",
         "_url":  "https://hitmarker.net/jobs/example-tech-project-manager-1688679",

@@ -2,7 +2,7 @@
 // grouped by source. Status pill (ok / partial / error) makes failures
 // scannable at a glance. the original author opens this whenever something looks off.
 
-document.addEventListener('DOMContentLoaded', async  => {
+document.addEventListener('DOMContentLoaded', async () => {
   const summaryEl = document.getElementById('summary');
   const gridEl    = document.getElementById('runs-grid');
 
@@ -16,10 +16,10 @@ document.addEventListener('DOMContentLoaded', async  => {
     const bySource = {};
     for (const r of data.scrape_runs) {
       const k = r.source_name || 'unknown';
-      (bySource[k] = bySource[k] || ).push(r);
+      (bySource[k] = bySource[k] || []).push(r);
     }
     // Keep server-provided ordering: it returns runs sorted desc by ts.
-    const sources = Object.keys(bySource).sort;
+    const sources = Object.keys(bySource).sort();
     if (sources.length === 0) {
       gridEl.innerHTML = '<p class="muted">No scrape runs recorded yet. Trigger one from the CLI (RUNBOOK §8).</p>';
       return;

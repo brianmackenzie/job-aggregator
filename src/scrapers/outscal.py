@@ -43,7 +43,7 @@ _WHITESPACE_RE = re.compile(r"\s+")
 def _clean(s: str) -> str:
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 @register("outscal")
@@ -61,7 +61,7 @@ class OutscalScraper(BaseScraper):
     def fetch(self) -> Iterable[dict]:
         # Single GET — Next.js server-renders the first page of jobs into
         # the initial HTML; no pagination needed for daily-cadence sourcing.
-        self._throttle
+        self._throttle()
         resp = requests.get(
             self.LIST_URL,
             headers={
@@ -70,14 +70,14 @@ class OutscalScraper(BaseScraper):
             },
             timeout=30,
         )
-        resp.raise_for_status
+        resp.raise_for_status()
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
         # Job cards: <a class="block" href="/job/<slug>">. The "block" class
         # on a Tailwind site is generic, so we anchor on the href shape
         # (must start with "/job/") to filter out nav/UI links.
-        seen_hrefs: set[str] = set
+        seen_hrefs: set[str] = set()
         for anchor in soup.find_all("a", href=True):
             href = anchor["href"]
             if not href.startswith("/job/") or href == "/job/":
@@ -118,7 +118,7 @@ class OutscalScraper(BaseScraper):
         # role title, not the company. Better to skip the row than scramble.
         company = ""
         for p in soup.find_all("p"):
-            classes = " ".join(p.get("class") or )
+            classes = " ".join(p.get("class") or [])
             if "font-medium" in classes:
                 txt = _clean(p.get_text(" ", strip=True))
                 if txt:
@@ -131,7 +131,7 @@ class OutscalScraper(BaseScraper):
         # "(Remote)" or "(Onsite)".
         location = None
         for p in soup.find_all("p"):
-            classes = " ".join(p.get("class") or )
+            classes = " ".join(p.get("class") or [])
             if "line-clamp-1" in classes and "font-medium" not in classes:
                 txt = _clean(p.get_text(" ", strip=True))
                 if txt:
@@ -149,7 +149,7 @@ class OutscalScraper(BaseScraper):
         # remote inference from the location string suffix.
         remote = None
         if location:
-            lower = location.lower
+            lower = location.lower()
             if "remote" in lower or "anywhere" in lower:
                 remote = True
             elif "onsite" in lower or "on-site" in lower or "in-office" in lower:

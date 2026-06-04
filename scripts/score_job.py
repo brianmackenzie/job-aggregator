@@ -34,7 +34,7 @@ import sys
 from pathlib import Path
 
 # Make src/ importable when running from the repo root.
-_REPO_ROOT = Path(__file__).resolve.parent.parent
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 
@@ -53,7 +53,7 @@ def _print_prefilter_verdict(label: str, job: dict, verdict: dict) -> None:
     print(f"  Title:      {job.get('title','?')}")
     print(f"  Company:    {job.get('company','?')}")
     print(f"  Location:   {job.get('location','?')}")
-    print
+    print()
     passed = verdict.get("passed")
     print(f"  Passed:            {passed}  ({'Haiku would be called' if passed else 'no Haiku call - final score = 0'})")
     print(f"  Reason:            {verdict.get('prefilter_reason')}")
@@ -63,22 +63,22 @@ def _print_prefilter_verdict(label: str, job: dict, verdict: dict) -> None:
     print(f"  Location flag:     {verdict.get('location_flag')}")
     print(f"  Company_normalized:{verdict.get('company_normalized')}")
 
-    flags = 
+    flags = []
     if verdict.get("is_dream_company"): flags.append("dream-tier")
     if verdict.get("is_hrc100"):        flags.append("HRC 100")
     if verdict.get("is_crunch_co"):     flags.append("crunch-risk")
     print(f"  Company flags:     {', '.join(flags) if flags else '(none)'}")
 
-    hds = verdict.get("hard_disqualifiers") or 
-    sws = verdict.get("soft_warnings") or 
-    pos = verdict.get("positive_signals") or 
+    hds = verdict.get("hard_disqualifiers") or []
+    sws = verdict.get("soft_warnings") or []
+    pos = verdict.get("positive_signals") or []
     print(f"  Hard disqualifiers: {', '.join(hds) if hds else '(none)'}")
     print(f"  Soft warnings:      {', '.join(sws) if sws else '(none)'}")
     print(f"  Positive signals:   {', '.join(pos) if pos else '(none)'}")
 
 
 def _print_result(label: str, job: dict, result: dict) -> None:
-    """Pretty-print a score_combined result for human eyes.
+    """Pretty-print a score_combined() result for human eyes.
 
     drops the "ALGO X / SEMANTIC Y / BLENDED Z" formatting
     since there's no blend anymore. Now the story is "prefilter pass/fail,
@@ -88,16 +88,16 @@ def _print_result(label: str, job: dict, result: dict) -> None:
     print(f"  Title:      {job.get('title','?')}")
     print(f"  Company:    {job.get('company','?')}")
     print(f"  Location:   {job.get('location','?')}")
-    print
+    print()
 
     # Prefilter verdict line.
     passed = result.get("passed_prefilter")
     reason = result.get("prefilter_reason") or "unknown"
     print(f"  PREFILTER:        {'PASS' if passed else 'FAIL'}   (reason: {reason})")
 
-    pos = result.get("positive_signals") or 
-    sws = result.get("soft_warnings") or 
-    hds = result.get("hard_disqualifiers") or 
+    pos = result.get("positive_signals") or []
+    sws = result.get("soft_warnings") or []
+    hds = result.get("hard_disqualifiers") or []
     if pos: print(f"  positive signals: {', '.join(pos)}")
     if sws: print(f"  soft warnings:    {', '.join(sws)}")
     if hds: print(f"  hard gates:       {', '.join(hds)}")
@@ -123,12 +123,12 @@ def _print_result(label: str, job: dict, result: dict) -> None:
         print(f"  geography_match:   {result.get('geography_match')}")
         print(f"  level_match:       {result.get('level_match')}")
         print(f"  watchlist_dream:   {result.get('watchlist_dream')}")
-        lfc = result.get("life_fit_concerns") or 
+        lfc = result.get("life_fit_concerns") or []
         if lfc:
             print(f"  life_fit_concerns: {', '.join(lfc)}")
 
     # Final.
-    print
+    print()
     print(f"  FINAL:            {result.get('score'):>3}   "
           f"tier={result.get('tier')}   track={result.get('track')}")
 
@@ -188,7 +188,7 @@ def _mode_dynamodb(args) -> int:
         # Persist the new score back. Useful for ad-hoc rescore of one
         # job without invoking the rescore Lambda.
         from common.normalize import score_posted_sk
-        table = db.jobs_table
+        table = db.jobs_table()
         update_parts = [
             "score = :s", "algo_score = :a", "track = :t",
             "score_posted = :sp", "modifiers_applied = :m",
@@ -222,7 +222,7 @@ def _mode_dynamodb(args) -> int:
             values[":gm"]  = result.get("geography_match") or "unclear"
             values[":lm"]  = result.get("level_match") or "unclear"
             values[":wd"]  = bool(result.get("watchlist_dream") or False)
-            values[":lfc"] = list(result.get("life_fit_concerns") or )
+            values[":lfc"] = list(result.get("life_fit_concerns") or [])
         table.update_item(
             Key={"job_id": job_id},
             UpdateExpression="SET " + ", ".join(update_parts),
@@ -235,7 +235,7 @@ def _mode_dynamodb(args) -> int:
 def _mode_json(args) -> int:
     """Score a hypothetical job loaded from a JSON file or inline string."""
     raw = args.json
-    if Path(raw).exists:
+    if Path(raw).exists():
         with open(raw, "r", encoding="utf-8") as fh:
             job = json.load(fh)
     else:
@@ -247,7 +247,7 @@ def _mode_json(args) -> int:
             return 2
 
     # Synthesise required fields if missing — the scoring pipeline needs them.
-    job.setdefault("company_normalized", (job.get("company") or "").lower.strip)
+    job.setdefault("company_normalized", (job.get("company") or "").lower().strip())
     job.setdefault("posted_at", "")
 
     if args.prefilter_only:
@@ -270,7 +270,7 @@ def _mode_calibrate(args) -> int:
     profile_path = _REPO_ROOT / "config" / "candidate_profile.yaml"
     with open(profile_path, "r", encoding="utf-8") as fh:
         profile = yaml.safe_load(fh)
-    anchors = profile.get("calibration_anchors") or 
+    anchors = profile.get("calibration_anchors") or []
     if not anchors:
         print("ERROR: no calibration_anchors in candidate_profile.yaml",
               file=sys.stderr)
@@ -281,7 +281,7 @@ def _mode_calibrate(args) -> int:
     for a in anchors:
         job = a["fixture"]
         job.setdefault("company_normalized",
-                       (job.get("company") or "").lower.strip)
+                       (job.get("company") or "").lower().strip())
         job.setdefault("posted_at", "")
         result = _score(job, skip_semantic=False, force_semantic=True)
         score = result.get("score") or 0
@@ -304,7 +304,7 @@ def _mode_calibrate(args) -> int:
 # Arg parser
 # ------------------------------------------------------------------
 
-def main -> int:
+def main() -> int:
     p = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -328,7 +328,7 @@ def main -> int:
                    help="Persist the new score back to DynamoDB "
                         "(only with --job-id / --source)")
 
-    args = p.parse_args
+    args = p.parse_args()
 
     if args.source and not args.native_id:
         p.error("--source requires --native-id")
@@ -347,4 +347,4 @@ def main -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main)
+    sys.exit(main())

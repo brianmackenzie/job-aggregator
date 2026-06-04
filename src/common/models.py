@@ -3,7 +3,7 @@
 Used by the scraper pipeline and tests as typed intermediaries. The
 persistence layer (`db.py`) accepts and returns plain dicts at the
 DynamoDB boundary — keeping Lambdas simple and JSON-serializable.
-`to_dict` on each class drops None fields so DynamoDB doesn't
+`to_dict()` on each class drops None fields so DynamoDB doesn't
 store meaningless empty values.
 """
 from dataclasses import asdict, dataclass, field
@@ -23,7 +23,7 @@ class Job:
     posted_at: str
     scraped_at: str
     status: str = "active"            # active | archived | hidden | applied
-    track: str = "unscored"           # unscored | gaming | media | igaming | analyst | other
+    track: str = "unscored"           # unscored | gaming | media | online wagering | analyst | other
     score: int = 0
     score_posted: str = ""            # "0087#2026-04-16T..."
     location: Optional[str] = None
@@ -45,7 +45,7 @@ class Job:
 
     def to_dict(self) -> dict:
         # Drop Nones so DynamoDB doesn't get empty attributes.
-        return {k: v for k, v in asdict(self).items if v is not None}
+        return {k: v for k, v in asdict(self).items() if v is not None}
 
 
 @dataclass
@@ -63,7 +63,7 @@ class Company:
     active: bool = True
 
     def to_dict(self) -> dict:
-        return {k: v for k, v in asdict(self).items if v is not None}
+        return {k: v for k, v in asdict(self).items() if v is not None}
 
 
 @dataclass
@@ -81,4 +81,4 @@ class ScrapeRun:
     expires_at: int = 0                # unix epoch — TTL attribute
 
     def to_dict(self) -> dict:
-        return {k: v for k, v in asdict(self).items if v is not None}
+        return {k: v for k, v in asdict(self).items() if v is not None}

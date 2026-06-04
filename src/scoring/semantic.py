@@ -30,7 +30,7 @@ Why a separate module:
     - Keeps anthropic SDK + SSM dependency out of the prefilter, so
       the prefilter stays unit-testable without mocking AWS or the
       Anthropic API.
-    - Lets `combined.score_combined` decide *whether* to call us
+    - Lets `combined.score_combined()` decide *whether* to call us
       based on prefilter outcome, cache freshness, or a kill switch
       in scoring.yaml.
 
@@ -42,7 +42,7 @@ Failure modes (all return None — never raise):
     - Response missing score/rationale   → log + None
 
 Cost / rate limit:
-    - One call per `semantic_score` invocation.
+    - One call per `semantic_score()` invocation.
     - Module-level rate-limiter ensures min spacing per
       scoring.yaml::semantic.rate_limit_sleep_ms within a single
       Lambda container's lifetime.
@@ -71,29 +71,29 @@ from .keywords import CFG  # the parsed scoring.yaml dict
 _SEMANTIC_CFG: dict = CFG.get("semantic", {}) or {}
 
 
-def _semantic_enabled -> bool:
+def _semantic_enabled() -> bool:
     """Kill switch — set semantic.enabled: false in scoring.yaml to bypass."""
     return bool(_SEMANTIC_CFG.get("enabled", False))
 
 
-def _model -> str:
+def _model() -> str:
     return _SEMANTIC_CFG.get("model", "claude-haiku-4-5-20251001")
 
 
-def _max_tokens -> int:
+def _max_tokens() -> int:
     return int(_SEMANTIC_CFG.get("max_tokens", 200))
 
 
-def _temperature -> float:
+def _temperature() -> float:
     return float(_SEMANTIC_CFG.get("temperature", 0.0))
 
 
-def _rate_limit_sleep_seconds -> float:
+def _rate_limit_sleep_seconds() -> float:
     """Min spacing between API calls inside ONE Lambda container."""
     return float(_SEMANTIC_CFG.get("rate_limit_sleep_ms", 500)) / 1000.0
 
 
-def _ssm_key_name -> str:
+def _ssm_key_name() -> str:
     return _SEMANTIC_CFG.get("ssm_key_name", "/jobs-aggregator/anthropic_api_key")
 
 
@@ -105,7 +105,7 @@ def _ssm_key_name -> str:
 _PROFILE_CACHE: Optional[dict] = None
 
 
-def _find_profile_path -> Path:
+def _find_profile_path() -> Path:
     """Locate candidate_profile.yaml across dev + Lambda layouts.
 
     Candidate order (first match wins):
@@ -125,7 +125,7 @@ def _find_profile_path -> Path:
            src/config/ under /var/task/. Kept as a belt-and-braces
            fallback during the migration.
     """
-    here = Path(__file__).resolve.parent
+    here = Path(__file__).resolve().parent
     candidates = [
         Path("/opt/candidate_profile.yaml"),                       # Lambda layer (prod)
         here.parent.parent / "config" / "candidate_profile.yaml",  # repo-root (dev)
@@ -133,7 +133,7 @@ def _find_profile_path -> Path:
         Path("/var/task/config/candidate_profile.yaml"),           # legacy runtime
     ]
     for p in candidates:
-        if p.exists:
+        if p.exists():
             return p
     raise FileNotFoundError(
         "candidate_profile.yaml not found — checked: "
@@ -141,17 +141,17 @@ def _find_profile_path -> Path:
     )
 
 
-def _load_profile -> dict:
+def _load_profile() -> dict:
     """Parse + cache candidate_profile.yaml."""
     global _PROFILE_CACHE
     if _PROFILE_CACHE is None:
-        with open(_find_profile_path, "r", encoding="utf-8") as fh:
+        with open(_find_profile_path(), "r", encoding="utf-8") as fh:
             _PROFILE_CACHE = yaml.safe_load(fh)
     return _PROFILE_CACHE
 
 
-def _system_prompt -> str:
-    return _load_profile["system_prompt"]
+def _system_prompt() -> str:
+    return _load_profile()["system_prompt"]
 
 
 # ------------------------------------------------------------------
@@ -162,7 +162,7 @@ def _system_prompt -> str:
 _API_KEY_CACHE: Optional[str] = None
 
 
-def _get_api_key -> Optional[str]:
+def _get_api_key() -> Optional[str]:
     """Return the Anthropic API key from SSM, or None if unavailable.
 
     Tries env var ANTHROPIC_API_KEY first (useful for local dev / CLI
@@ -176,20 +176,20 @@ def _get_api_key -> Optional[str]:
     # 1. Env var override — for `python scripts/score_job.py` locally.
     env = os.environ.get("ANTHROPIC_API_KEY")
     if env:
-        _API_KEY_CACHE = env.strip
+        _API_KEY_CACHE = env.strip()
         return _API_KEY_CACHE
 
     # 2. SSM Parameter Store — production path.
     try:
         import boto3
         ssm = boto3.client("ssm", region_name=os.environ.get("AWS_REGION", "us-east-1"))
-        resp = ssm.get_parameter(Name=_ssm_key_name, WithDecryption=True)
+        resp = ssm.get_parameter(Name=_ssm_key_name(), WithDecryption=True)
         _API_KEY_CACHE = resp["Parameter"]["Value"]
         return _API_KEY_CACHE
     except Exception as exc:
         log.warn(
             "semantic_ssm_key_fetch_failed",
-            ssm_key=_ssm_key_name,
+            ssm_key=_ssm_key_name(),
             error=str(exc),
         )
         return None
@@ -203,7 +203,7 @@ def _get_api_key -> Optional[str]:
 _CLIENT_CACHE = None
 
 
-def _get_client:
+def _get_client():
     """Build an anthropic.Anthropic client, cached per Lambda container.
 
     Returns None if the SDK isn't installed or no API key is available
@@ -213,7 +213,7 @@ def _get_client:
     if _CLIENT_CACHE is not None:
         return _CLIENT_CACHE
 
-    api_key = _get_api_key
+    api_key = _get_api_key()
     if not api_key:
         return None
 
@@ -250,16 +250,16 @@ def _get_client:
 _LAST_CALL_AT: float = 0.0
 
 
-def _throttle -> None:
+def _throttle() -> None:
     """Sleep so we maintain at least rate_limit_sleep_seconds between calls."""
     global _LAST_CALL_AT
-    min_interval = _rate_limit_sleep_seconds
+    min_interval = _rate_limit_sleep_seconds()
     if min_interval <= 0:
         return
-    elapsed = time.monotonic - _LAST_CALL_AT
+    elapsed = time.monotonic() - _LAST_CALL_AT
     if elapsed < min_interval:
         time.sleep(min_interval - elapsed)
-    _LAST_CALL_AT = time.monotonic
+    _LAST_CALL_AT = time.monotonic()
 
 
 # ------------------------------------------------------------------
@@ -281,7 +281,7 @@ def _format_prefilter_summary(prefilter_output: dict) -> str:
     and the original author's budget target is ~$0.0005/job.
 
     Only includes sections that have content — an empty block is cleaner
-    than "positive_signals: " repeated noise.
+    than "positive_signals: []" repeated noise.
     """
     lines: list[str] = ["--- Pre-filter context ---"]
 
@@ -301,7 +301,7 @@ def _format_prefilter_summary(prefilter_output: dict) -> str:
     if loc_flag:
         lines.append(f"Location flag: {loc_flag}")
 
-    company_flags: list[str] = 
+    company_flags: list[str] = []
     if prefilter_output.get("is_dream_company"):
         company_flags.append("dream-tier")
     if prefilter_output.get("is_hrc100"):
@@ -311,11 +311,11 @@ def _format_prefilter_summary(prefilter_output: dict) -> str:
     if company_flags:
         lines.append(f"Company flags: {', '.join(company_flags)}")
 
-    pos = prefilter_output.get("positive_signals") or 
+    pos = prefilter_output.get("positive_signals") or []
     if pos:
         lines.append(f"Positive signals fired: {', '.join(pos)}")
 
-    soft = prefilter_output.get("soft_warnings") or 
+    soft = prefilter_output.get("soft_warnings") or []
     if soft:
         lines.append(f"Soft warnings fired: {', '.join(soft)}")
 
@@ -336,13 +336,13 @@ def _build_user_message(
     rates the role holistically and returns the 9-field schema defined
     in config/candidate_profile.yaml::### OUTPUT FORMAT.
     """
-    title       = (job.get("title") or "").strip
-    company     = (job.get("company") or "").strip
-    location    = (job.get("location") or "").strip
+    title       = (job.get("title") or "").strip()
+    company     = (job.get("company") or "").strip()
+    location    = (job.get("location") or "").strip()
     remote      = "yes" if job.get("remote") else "no"
     salary_min  = job.get("salary_min")
     salary_max  = job.get("salary_max")
-    description = (job.get("description") or "").strip
+    description = (job.get("description") or "").strip()
 
     if len(description) > _JD_MAX_CHARS:
         description = description[:_JD_MAX_CHARS] + "\n\n[…description truncated…]"
@@ -401,7 +401,7 @@ def _normalize_work_mode(raw: object) -> str:
     """
     if not isinstance(raw, str):
         return "unclear"
-    lo = raw.strip.lower
+    lo = raw.strip().lower()
     if not lo:
         return "unclear"
     if lo in _WORK_MODE_ALLOWED:
@@ -436,7 +436,7 @@ def _coerce_enum(raw: object, allowed: set[str], default: str = "unclear") -> st
     """
     if not isinstance(raw, str):
         return default
-    lo = raw.strip.lower
+    lo = raw.strip().lower()
     if not lo:
         return default
     if lo in allowed:
@@ -458,7 +458,7 @@ def _coerce_bool(raw: object, default: bool = False) -> bool:
     if isinstance(raw, (int, float)):
         return bool(raw)
     if isinstance(raw, str):
-        lo = raw.strip.lower
+        lo = raw.strip().lower()
         if lo in {"true", "yes", "1"}:
             return True
         if lo in {"false", "no", "0", ""}:
@@ -475,18 +475,18 @@ def _coerce_str_list(raw: object, max_items: int = 8, max_len: int = 120) -> lis
     list[str].
     """
     if raw is None:
-        return 
+        return []
     if isinstance(raw, str):
         # Tolerate a single phrase returned as a bare string.
-        s = raw.strip
-        return [s[:max_len]] if s else 
+        s = raw.strip()
+        return [s[:max_len]] if s else []
     if not isinstance(raw, list):
-        return 
-    out: list[str] = 
+        return []
+    out: list[str] = []
     for item in raw[:max_items]:
         if not isinstance(item, str):
             continue
-        s = item.strip
+        s = item.strip()
         if s:
             out.append(s[:max_len])
     return out
@@ -520,7 +520,7 @@ def _salvage_truncated_json(raw: str) -> Optional[str]:
     s = raw[start:]
 
     # Track what's open. Each entry is one of: '"', '{', '['.
-    stack: list[str] = 
+    stack: list[str] = []
     in_string = False
     escape    = False
 
@@ -534,7 +534,7 @@ def _salvage_truncated_json(raw: str) -> Optional[str]:
             elif ch == '"':
                 in_string = False
                 if stack and stack[-1] == '"':
-                    stack.pop
+                    stack.pop()
             continue
         if ch == '"':
             in_string = True
@@ -543,10 +543,10 @@ def _salvage_truncated_json(raw: str) -> Optional[str]:
             stack.append(ch)
         elif ch == "}":
             if stack and stack[-1] == "{":
-                stack.pop
+                stack.pop()
         elif ch == "]":
             if stack and stack[-1] == "[":
-                stack.pop
+                stack.pop()
 
     # Build the closers in reverse stack order.
     _closers = {'"': '"', "{": "}", "[": "]"}
@@ -571,7 +571,7 @@ def _parse_response(raw: str) -> Optional[dict]:
         return None
 
     # Try a clean parse first.
-    cleaned = raw.strip
+    cleaned = raw.strip()
     # Strip ```json … ``` fences if present.
     if cleaned.startswith("```"):
         cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", cleaned)
@@ -625,7 +625,7 @@ def _parse_response(raw: str) -> Optional[dict]:
 
         return {
             "score":             score_int,
-            "rationale":         (rationale or "").strip[:240],
+            "rationale":         (rationale or "").strip()[:240],
             "work_mode":         work_mode,
             "role_family_match": role_family,
             "industry_match":    industry_match,
@@ -649,7 +649,7 @@ def semantic_score(
     """Get a Haiku semantic-fit score for one job.
 
     signature: accepts an optional `prefilter_output` from
-    `scoring/algo_prefilter.py::prefilter`. When provided, the
+    `scoring/algo_prefilter.py::prefilter()`. When provided, the
     prefilter flags are rendered into the user message so Haiku can
     anchor its score against the deterministic signals.
 
@@ -670,16 +670,16 @@ def semantic_score(
     The caller is responsible for caching, tier-routing, and writing
     the result back to DynamoDB.
     """
-    if not _semantic_enabled:
+    if not _semantic_enabled():
         return None
 
-    client = _get_client
+    client = _get_client()
     if client is None:
         # Either no API key or no SDK — algo-only fallback.
         return None
 
     try:
-        system_prompt = _system_prompt
+        system_prompt = _system_prompt()
     except FileNotFoundError as exc:
         log.warn("semantic_profile_missing", error=str(exc))
         return None
@@ -687,11 +687,11 @@ def semantic_score(
     user_msg = _build_user_message(job, prefilter_output=prefilter_output)
 
     try:
-        _throttle
+        _throttle()
         resp = client.messages.create(
-            model       = _model,
-            max_tokens  = _max_tokens,
-            temperature = _temperature,
+            model       = _model(),
+            max_tokens  = _max_tokens(),
+            temperature = _temperature(),
             # Prompt caching (added 2026-06-02): the ~5.2K-token system
             # prompt is identical on every call in a rescore batch, so caching
             # it cuts input cost ~10x on the cached portion (5-min TTL,
@@ -705,7 +705,7 @@ def semantic_score(
         log.warn(
             "semantic_api_call_failed",
             job_id=job.get("job_id"),
-            model=_model,
+            model=_model(),
             error=str(exc),
             traceback=traceback.format_exc(limit=3),
         )
@@ -735,6 +735,6 @@ def semantic_score(
         )
         return None
 
-    parsed["model"]     = _model
+    parsed["model"]     = _model()
     parsed["scored_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     return parsed

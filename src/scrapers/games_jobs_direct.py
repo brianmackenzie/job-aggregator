@@ -45,7 +45,7 @@ _WHITESPACE_RE = re.compile(r"\s+")
 def _clean(s: str) -> str:
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 @register("games_jobs_direct")
@@ -68,7 +68,7 @@ class GamesJobsDirectScraper(BaseScraper):
         # The site has /jobs subpaths for filters; the homepage already
         # surfaces the most-recent + featured set, which is enough for a
         # daily-cadence batch.
-        self._throttle
+        self._throttle()
         resp = requests.get(
             self.LIST_URL,
             headers={
@@ -77,11 +77,11 @@ class GamesJobsDirectScraper(BaseScraper):
             },
             timeout=30,
         )
-        resp.raise_for_status
+        resp.raise_for_status()
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        seen_hrefs: set[str] = set
+        seen_hrefs: set[str] = set()
         for anchor in soup.find_all("a", href=True):
             href = anchor["href"]
             if not self._job_href_re.match(href) or href in seen_hrefs:
@@ -126,7 +126,7 @@ class GamesJobsDirectScraper(BaseScraper):
             # better than dropping the row entirely.
             parts = href.strip("/").split("/")
             if len(parts) >= 4 and parts[0] == "job":
-                company = _clean(parts[1].replace("-", " ").title)
+                company = _clean(parts[1].replace("-", " ").title())
 
         # ---- location ----------------------------------------------------
         location = None
@@ -151,7 +151,7 @@ class GamesJobsDirectScraper(BaseScraper):
         # remote inference. Site doesn't have a structured remote field;
         # check both location AND description for "remote" / "hybrid".
         remote = None
-        haystack = " ".join(s for s in (location, description) if s).lower
+        haystack = " ".join(s for s in (location, description) if s).lower()
         if "remote" in haystack or "anywhere" in haystack or "worldwide" in haystack:
             remote = True
         elif "onsite" in haystack or "on-site" in haystack:

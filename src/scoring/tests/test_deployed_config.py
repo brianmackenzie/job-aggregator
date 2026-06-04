@@ -30,7 +30,7 @@ import yaml
 
 
 # Repo root = three levels up from this file (src/scoring/tests/ -> src/scoring/ -> src/ -> repo)
-_REPO_ROOT = Path(__file__).resolve.parents[3]
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 _CONFIG_DIR = _REPO_ROOT / "config"
 _TEMPLATE = _REPO_ROOT / "template.yaml"
 
@@ -52,7 +52,7 @@ _EXPECTED_YAMLS = [
 def test_canonical_yaml_exists(filename: str) -> None:
     """Each of the 5 config files must exist at <repo-root>/config/."""
     path = _CONFIG_DIR / filename
-    assert path.exists, (
+    assert path.exists(), (
         f"Missing canonical config: {path}\n"
         f"The Lambda layer ContentUri points at this directory — if the "
         f"file is missing, the deployed layer will be broken."
@@ -63,7 +63,7 @@ def test_canonical_yaml_exists(filename: str) -> None:
 # 2. src/config/ MUST NOT exist.
 # ---------------------------------------------------------------------------
 
-def test_no_src_config_duplicate -> None:
+def test_no_src_config_duplicate() -> None:
     """src/config/ was the source of the divergence bug.
 
     If this test fails, someone has re-introduced the duplicate. The
@@ -73,7 +73,7 @@ def test_no_src_config_duplicate -> None:
     ever came back. Nuke it.
     """
     bad_dir = _REPO_ROOT / "src" / "config"
-    assert not bad_dir.exists, (
+    assert not bad_dir.exists(), (
         f"Forbidden directory exists: {bad_dir}\n"
         f"This is the pre-fb3 duplicate config location. Delete it and "
         f"keep config/ at the repo root as the single source of truth."
@@ -84,7 +84,7 @@ def test_no_src_config_duplicate -> None:
 # 3. candidate_profile.yaml contains the Bug-2 calibration marker.
 # ---------------------------------------------------------------------------
 
-def test_candidate_profile_has_calibration_marker -> None:
+def test_candidate_profile_has_calibration_marker() -> None:
     """The 'USE THE FULL 0-100 RANGE' instruction is the 
     Bug-2 fix — without it, Haiku compresses everything into a narrow
     band (50-70) and the scoring signal collapses.
@@ -112,12 +112,12 @@ _STRUCTURAL_MARKERS = {
     "sources.yaml":     ["sources"],
     "taxonomy.yaml":    ["industries", "role_types"],
     # candidate_profile.yaml: the system_prompt key is the non-negotiable
-    # top-level key used by scoring.semantic._system_prompt.
+    # top-level key used by scoring.semantic._system_prompt().
     "candidate_profile.yaml": ["system_prompt"],
 }
 
 
-@pytest.mark.parametrize("filename,markers", list(_STRUCTURAL_MARKERS.items))
+@pytest.mark.parametrize("filename,markers", list(_STRUCTURAL_MARKERS.items()))
 def test_yaml_structural_keys(filename: str, markers: list[str]) -> None:
     """Each YAML must parse and contain its expected top-level keys."""
     path = _CONFIG_DIR / filename
@@ -138,7 +138,7 @@ def test_yaml_structural_keys(filename: str, markers: list[str]) -> None:
 # 5. template.yaml declares ConfigLayer with ContentUri: config/.
 # ---------------------------------------------------------------------------
 
-def test_template_has_configlayer -> None:
+def test_template_has_configlayer() -> None:
     """template.yaml must declare a ConfigLayer whose ContentUri points
     at the repo-root config/ directory. This is the whole point of the
     fb3 refactor — if the ContentUri ever gets changed to something
@@ -164,7 +164,7 @@ def test_template_has_configlayer -> None:
 # 6. sources.yaml carries the scraper_defaults block with contact_email.
 # ---------------------------------------------------------------------------
 
-def test_sources_yaml_has_scraper_defaults -> None:
+def test_sources_yaml_has_scraper_defaults() -> None:
     """sources.yaml must declare `scraper_defaults.contact_email`.
 
     This is the single source of truth for the operator's reachable email,

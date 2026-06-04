@@ -14,17 +14,17 @@ TABLE  = "jobs-aggregator-JobsTable-1EV6UZWFB7MVY"
 ddb   = boto3.resource("dynamodb", region_name=REGION)
 table = ddb.Table(TABLE)
 
-items = 
+items = []
 resp  = table.scan(
     ProjectionExpression="job_id, title, company, score, gates_triggered, track"
 )
-items.extend(resp.get("Items", ))
+items.extend(resp.get("Items", []))
 while "LastEvaluatedKey" in resp:
     resp = table.scan(
         ProjectionExpression="job_id, title, company, score, gates_triggered, track",
         ExclusiveStartKey=resp["LastEvaluatedKey"],
     )
-    items.extend(resp.get("Items", ))
+    items.extend(resp.get("Items", []))
 
 # --- Bucket counts ---
 buckets = {"gated_0": 0, "1-34": 0, "35-49": 0, "50-64": 0, "65-77_T2": 0, "78+_T1": 0}
@@ -45,7 +45,7 @@ for j in items:
 
 print(f"Total jobs scanned: {len(items)}\n")
 print("Score buckets:")
-for k, v in buckets.items:
+for k, v in buckets.items():
     print(f"  {k:<12} {v:>4}")
 
 # --- Top 20 ---

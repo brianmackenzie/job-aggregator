@@ -96,18 +96,18 @@ from .taxonomy import classify as classify_taxonomy
 # is module-cached at import time but dict lookups are essentially free.
 # ------------------------------------------------------------------
 
-def _semantic_cfg -> dict:
+def _semantic_cfg() -> dict:
     return CFG.get("semantic", {}) or {}
 
 
-def _enabled -> bool:
+def _enabled() -> bool:
     """Kill switch. If False, every job gets tier=needs_review."""
-    return bool(_semantic_cfg.get("enabled", False))
+    return bool(_semantic_cfg().get("enabled", False))
 
 
-def _cache_days -> int:
+def _cache_days() -> int:
     """How many days a cached semantic score stays fresh."""
-    return int(_semantic_cfg.get("cache_days", 7))
+    return int(_semantic_cfg().get("cache_days", 7))
 
 
 # ------------------------------------------------------------------
@@ -131,14 +131,14 @@ def _has_fresh_semantic(job: dict) -> bool:
     except (ValueError, TypeError):
         return False
     age = datetime.now(timezone.utc) - scored_at
-    return age < timedelta(days=_cache_days)
+    return age < timedelta(days=_cache_days())
 
 
 def _read_cached_semantic(job: dict) -> Optional[dict]:
     """Pull a previously-stored semantic result back into the response shape.
 
     the cached row may be from BEFORE the new structured output
-    fields existed. Missing fields default to 'unclear' / False /  so
+    fields existed. Missing fields default to 'unclear' / False / [] so
     the caller doesn't have to special-case legacy rows.
     """
     if not _has_fresh_semantic(job):
@@ -155,7 +155,7 @@ def _read_cached_semantic(job: dict) -> Optional[dict]:
         "geography_match":   job.get("geography_match") or "unclear",
         "level_match":       job.get("level_match") or "unclear",
         "watchlist_dream":   bool(job.get("watchlist_dream") or False),
-        "life_fit_concerns": list(job.get("life_fit_concerns") or ),
+        "life_fit_concerns": list(job.get("life_fit_concerns") or []),
     }
 
 
@@ -257,7 +257,7 @@ def score_combined(
     """
 
     # ---------- 1. Run the binary prefilter ----------------------
-    # This replaces the old weighted-score engine.score call. The
+    # This replaces the old weighted-score engine.score() call. The
     # prefilter decides pass/fail categorically — no 0-100 number.
     pf = run_prefilter(job, prefs)
     passed   = bool(pf.get("passed"))
@@ -271,7 +271,7 @@ def score_combined(
     try:
         tax = classify_taxonomy(job)
     except Exception:
-        tax = {"industries": , "role_types": , "company_group": None}
+        tax = {"industries": [], "role_types": [], "company_group": None}
     try:
         qol = score_qol(job)
     except Exception:
@@ -298,8 +298,8 @@ def score_combined(
         "track":               track,
         # Legacy shape bits kept for downstream consumers.
         "breakdown":           {"prefilter": pf},
-        "gates_triggered":     list(pf.get("hard_disqualifiers") or ),
-        "modifiers_applied":   list(pf.get("soft_warnings") or ),
+        "gates_triggered":     list(pf.get("hard_disqualifiers") or []),
+        "modifiers_applied":   list(pf.get("soft_warnings") or []),
         "algo_score":          100 if passed else 0,  # binary diagnostic
         # Semantic fields — default to "never called".
         "semantic_score":      None,
@@ -333,9 +333,9 @@ def score_combined(
         "prefilter_reason":    pf.get("prefilter_reason") or (
             "passed" if passed else "unknown_prefilter_fail"
         ),
-        "hard_disqualifiers":  list(pf.get("hard_disqualifiers") or ),
-        "soft_warnings":       list(pf.get("soft_warnings") or ),
-        "positive_signals":    list(pf.get("positive_signals") or ),
+        "hard_disqualifiers":  list(pf.get("hard_disqualifiers") or []),
+        "soft_warnings":       list(pf.get("soft_warnings") or []),
+        "positive_signals":    list(pf.get("positive_signals") or []),
         "is_dream_company":    bool(pf.get("is_dream_company") or False),
         "is_hrc100":           bool(pf.get("is_hrc100") or False),
         "is_crunch_co":        bool(pf.get("is_crunch_co") or False),
@@ -347,13 +347,13 @@ def score_combined(
         "industry":            pf.get("industry"),
         "industry_score":      pf.get("industry_score"),
         # Haiku structured passthroughs — default to "unclear" / False
-        # / . Overwritten when Haiku returns a full response.
+        # / []. Overwritten when Haiku returns a full response.
         "role_family_match":   "unclear",
         "industry_match":      "unclear",
         "geography_match":     "unclear",
         "level_match":         "unclear",
         "watchlist_dream":     False,
-        "life_fit_concerns":   ,
+        "life_fit_concerns":   [],
     }
 
     # ---------- 4. Prefilter fail → final score 0, tier DISQUALIFIED ----
@@ -372,7 +372,7 @@ def score_combined(
     # (dry run, unit tests). Prefilter-passed jobs with no semantic
     # land in needs_review so the original author sees them in the UI rather than
     # silently falling into skip.
-    if skip_semantic or not _enabled:
+    if skip_semantic or not _enabled():
         out["tier"] = _derive_tier(
             passed_prefilter=True,
             semantic_available=False,
@@ -425,7 +425,7 @@ def score_combined(
     out["geography_match"]    = semantic_payload.get("geography_match") or "unclear"
     out["level_match"]        = semantic_payload.get("level_match") or "unclear"
     out["watchlist_dream"]    = watchlist_dream_flag
-    out["life_fit_concerns"]  = list(semantic_payload.get("life_fit_concerns") or )
+    out["life_fit_concerns"]  = list(semantic_payload.get("life_fit_concerns") or [])
 
     # ---------- 8. Derive tier from the final score ---------------
     # BUG 4 — pass the new is_dream_company /

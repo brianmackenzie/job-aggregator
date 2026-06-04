@@ -17,7 +17,7 @@ Design notes
   scoring/keywords.py).  Faster than regex, robust enough for the
   job-text we see.
 * `industries` is multi-value because real roles span sectors:
-  Roblox is gaming AND tech.  The frontend uses these as filter
+  a large platform company is gaming AND tech.  The frontend uses these as filter
   chips with OR-within-category, AND-across-category semantics.
 * `role_types` is multi-value because titles overlap disciplines:
   "VP Product Strategy" is product_strategy AND general_management.
@@ -47,7 +47,7 @@ def _find_config(filename: str) -> Path:
       3. <src-root>/config/...      — Legacy src/config/ fallback (pre-A2)
       4. /var/task/config/...       — Legacy runtime fallback (pre-A2)
     """
-    here = Path(__file__).resolve.parent
+    here = Path(__file__).resolve().parent
     candidates = [
         Path("/opt") / filename,                       # Lambda layer (prod)
         here.parent.parent / "config" / filename,      # repo root (dev)
@@ -55,7 +55,7 @@ def _find_config(filename: str) -> Path:
         Path("/var/task/config") / filename,           # legacy Lambda runtime
     ]
     for p in candidates:
-        if p.exists:
+        if p.exists():
             return p
     raise FileNotFoundError(
         f"{filename} not found — checked: " + ", ".join(str(c) for c in candidates)
@@ -80,14 +80,14 @@ COMPANY_GROUPS_CFG: dict = TAXONOMY.get("company_groups", {})
 
 # ---------------------------------------------------------------------
 # Tier-based company groups derived at runtime from companies.yaml.
-# Lazy-loaded the first time classify is called so we don't pay the
+# Lazy-loaded the first time classify() is called so we don't pay the
 # YAML parse cost in tests that don't need them.
 # ---------------------------------------------------------------------
 _TIER_GROUPS_CACHE: Optional[dict[str, set[str]]] = None
 
 
-def _tier_groups -> dict[str, set[str]]:
-    """Return {'tier_s': {'roblox', ...}, 'tier_1': {...}, 'tier_2': {...}}.
+def _tier_groups() -> dict[str, set[str]]:
+    """Return {'tier_s': {'a large platform company', ...}, 'tier_1': {...}, 'tier_2': {...}}.
 
     Pulls from companies.yaml so tier renames stay in one place.  Returns
     empty sets if companies.yaml isn't found (taxonomy still works on
@@ -96,12 +96,12 @@ def _tier_groups -> dict[str, set[str]]:
     global _TIER_GROUPS_CACHE
     if _TIER_GROUPS_CACHE is not None:
         return _TIER_GROUPS_CACHE
-    out: dict[str, set[str]] = {"tier_s": set, "tier_1": set, "tier_2": set}
+    out: dict[str, set[str]] = {"tier_s": set(), "tier_1": set(), "tier_2": set()}
     try:
-        cos = _load("companies.yaml").get("companies", ) or 
+        cos = _load("companies.yaml").get("companies", []) or []
         for co in cos:
-            tier = str(co.get("tier") or "").upper
-            n = (co.get("name_normalized") or "").lower.strip
+            tier = str(co.get("tier") or "").upper()
+            n = (co.get("name_normalized") or "").lower().strip()
             if not n:
                 continue
             if tier == "S":
@@ -127,31 +127,31 @@ def _job_text(job: dict) -> str:
         job.get("company", ""),
         job.get("description", ""),
     ]
-    return " ".join(str(p) for p in parts if p).lower
+    return " ".join(str(p) for p in parts if p).lower()
 
 
 def _job_title(job: dict) -> str:
     """Lower-case title only — used for role_type matching where
     description-level matches over-trigger."""
-    return str(job.get("title", "")).lower
+    return str(job.get("title", "")).lower()
 
 
 def _job_company_norm(job: dict) -> str:
-    """Lower-case normalized company name. Falls back to .lower of
+    """Lower-case normalized company name. Falls back to .lower() of
     `company` if company_normalized is absent (e.g. tests)."""
     return str(
         job.get("company_normalized") or job.get("company") or ""
-    ).lower.strip
+    ).lower().strip()
 
 
 def _any_substring(text: str, kws: list) -> bool:
-    return any(kw.lower in text for kw in (kws or ))
+    return any(kw.lower() in text for kw in (kws or []))
 
 
 def _any_company_match(co_norm: str, companies_list: list) -> bool:
     if not co_norm:
         return False
-    co_set = {c.lower.strip for c in (companies_list or )}
+    co_set = {c.lower().strip() for c in (companies_list or [])}
     return co_norm in co_set
 
 
@@ -172,12 +172,12 @@ def industries_for(job: dict) -> list[str]:
     """
     text = _job_text(job)
     co_norm = _job_company_norm(job)
-    matches: list[str] = 
-    for name, cfg in INDUSTRIES_CFG.items:
-        if _any_company_match(co_norm, cfg.get("companies", )):
+    matches: list[str] = []
+    for name, cfg in INDUSTRIES_CFG.items():
+        if _any_company_match(co_norm, cfg.get("companies", [])):
             matches.append(name)
             continue
-        if _any_substring(text, cfg.get("keywords", )):
+        if _any_substring(text, cfg.get("keywords", [])):
             matches.append(name)
     return matches
 
@@ -202,12 +202,12 @@ def role_types_for(job: dict) -> list[str]:
     """
     title = _job_title(job)
     text = _job_text(job)
-    matches: list[str] = 
+    matches: list[str] = []
 
-    for name, cfg in ROLE_TYPES_CFG.items:
-        title_kws  = cfg.get("title_keywords", ) or 
-        excludes   = cfg.get("title_excludes", ) or 
-        desc_kws   = cfg.get("description_keywords", ) or 
+    for name, cfg in ROLE_TYPES_CFG.items():
+        title_kws  = cfg.get("title_keywords", []) or []
+        excludes   = cfg.get("title_excludes", []) or []
+        desc_kws   = cfg.get("description_keywords", []) or []
 
         title_hit = _any_substring(title, title_kws)
         if title_hit:
@@ -244,14 +244,14 @@ def company_group_for(job: dict) -> Optional[str]:
         return None
 
     # Tier groups first (derived from companies.yaml).
-    tg = _tier_groups
+    tg = _tier_groups()
     for group_name in ("tier_s", "tier_1", "tier_2"):
-        if co_norm in tg.get(group_name, set):
+        if co_norm in tg.get(group_name, set()):
             return group_name
 
     # Then YAML-defined affinity groups.
-    for name, cfg in COMPANY_GROUPS_CFG.items:
-        if _any_company_match(co_norm, cfg.get("companies", )):
+    for name, cfg in COMPANY_GROUPS_CFG.items():
+        if _any_company_match(co_norm, cfg.get("companies", [])):
             return name
 
     return None

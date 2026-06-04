@@ -1,4 +1,4 @@
-"""
+# ===================================================================
 # PERSONAL PROFILE DATA — REPLACE BEFORE USING AT SCALE
 #
 # This module contains constants that encode the ORIGINAL AUTHOR'S
@@ -14,7 +14,7 @@
 #      your own geography, industry keywords, and company lists.
 #
 # See `docs/FORKING.md` for a file-by-file guide.
-"""
+# ===================================================================
 
 """
 src/scoring/algo_prefilter.py — Binary prefilter.
@@ -40,7 +40,7 @@ Output shape:
       "industry":             str,     # bucket name or "unknown"
       "industry_score":       int,     # 0-10, diagnostic
       "track":                str,     # TRACK_1_FULLTIME / TRACK_2_INTERIM / TRACK_3_PIVOT
-      "location_flag":        str,     # remote_us / nyc_metro / nj_office / out_of_area / heavy_office / unknown
+      "location_flag":        str,     # remote_us / regional_metro / local_metro / out_of_area / heavy_office / unknown
       "is_dream_company":     bool,    # in INDUSTRY_SCORES >= 9 via COMPANY_INDUSTRY_MAP
       "is_hrc100":            bool,    # HRC Corporate Equality 100 company
       "is_crunch_co":         bool,    # known crunch-culture studio
@@ -101,12 +101,12 @@ _LEADERSHIP_WHITELIST_RE = re.compile(
 # match (e.g., "machine learning engineer" is preferred over "ml
 # engineer"). Phrases are stripped of leading/trailing whitespace and
 # escaped for regex. Phrases <2 chars are dropped defensively.
-def _build_function_disqualifier_regex -> re.Pattern[str]:
+def _build_function_disqualifier_regex() -> re.Pattern[str]:
     """Build the single OR'd regex for HARD_DISQUALIFIER_TITLES_FUNCTION."""
-    seen: set[str] = set
-    cleaned: list[str] = 
+    seen: set[str] = set()
+    cleaned: list[str] = []
     for raw in CP.HARD_DISQUALIFIER_TITLES_FUNCTION:
-        kw = raw.strip
+        kw = raw.strip()
         if len(kw) < 2 or kw in seen:
             continue
         seen.add(kw)
@@ -118,7 +118,7 @@ def _build_function_disqualifier_regex -> re.Pattern[str]:
     return re.compile(pattern, re.IGNORECASE)
 
 
-_FUNCTION_DISQUALIFIER_RE = _build_function_disqualifier_regex
+_FUNCTION_DISQUALIFIER_RE = _build_function_disqualifier_regex()
 
 
 # word-boundary regex for WRONG_FUNCTION_EXEC_NEVER_RESCUE
@@ -151,7 +151,7 @@ _RELEVANCE_NOUN_RE = re.compile(
 # Compile the location regex groups once. Cache as dict[str, list[re.Pattern]].
 _LOC_RE: dict[str, list[re.Pattern[str]]] = {
     flag: [re.compile(p) for p in patterns]
-    for flag, patterns in CP.LOCATION_PATTERNS.items
+    for flag, patterns in CP.LOCATION_PATTERNS.items()
 }
 
 
@@ -161,7 +161,7 @@ _LOC_RE: dict[str, list[re.Pattern[str]]] = {
 
 def _title_lo(job: dict) -> str:
     """Lowercase job title, empty string on missing/None."""
-    return (job.get("title") or "").lower
+    return (job.get("title") or "").lower()
 
 
 def _full_text_lo(job: dict) -> str:
@@ -169,21 +169,21 @@ def _full_text_lo(job: dict) -> str:
 
     Used for positive-signal, soft-warning, and industry-keyword matching
     where context matters beyond just the title. Mirrors the behavior of
-    the legacy keywords.build_text helper.
+    the legacy keywords.build_text() helper.
     """
     parts = [
         job.get("title", "") or "",
         job.get("company", "") or "",
         job.get("description", "") or "",
     ]
-    return " ".join(parts).lower
+    return " ".join(parts).lower()
 
 
 def _normalize_company(job: dict) -> str:
     """Return job['company_normalized'] if set, else lowercase-trim company."""
     if job.get("company_normalized"):
-        return str(job["company_normalized"]).strip.lower
-    return (job.get("company") or "").strip.lower
+        return str(job["company_normalized"]).strip().lower()
+    return (job.get("company") or "").strip().lower()
 
 
 # ---------------------------------------------------------------------------
@@ -299,7 +299,7 @@ def _check_sub_vp_seniority(title_lo: str) -> str | None:
     """Return matched seniority kw (or None) — intern/entry/junior titles."""
     for kw in CP.HARD_DISQUALIFIER_TITLES_SENIORITY:
         if kw in title_lo:
-            return f"sub_vp_seniority:{kw.strip}"
+            return f"sub_vp_seniority:{kw.strip()}"
     return None
 
 
@@ -332,7 +332,7 @@ def _detect_industry(company_normalized: str, text_lo: str) -> str:
         return CP.COMPANY_INDUSTRY_MAP[company_normalized]
 
     # 2. Keyword fallback
-    for bucket, kws in CP.INDUSTRY_KEYWORDS.items:
+    for bucket, kws in CP.INDUSTRY_KEYWORDS.items():
         if any(kw in text_lo for kw in kws):
             return bucket
 
@@ -354,8 +354,8 @@ def _detect_location(job: dict) -> str:
     Order of precedence matters — once we match, we return. The order is:
       1. heavy_office (5-day RTO etc.)    → deal-breaker signal
       2. out_of_area (Seattle/SF/LA/etc.) → deal-breaker signal
-      3. nj_office                        → best case (commutable)
-      4. nyc_metro                        → good (hybrid-commutable)
+      3. local_metro                        → best case (commutable)
+      4. regional_metro                        → good (hybrid-commutable)
       5. remote_us                        → good (no commute needed)
       6. unknown                          → default
     """
@@ -377,14 +377,14 @@ def _detect_location(job: dict) -> str:
             return "out_of_area"
 
     # 3. NJ office (commutable from Anytown)
-    for pat in _LOC_RE["nj_office"]:
+    for pat in _LOC_RE["local_metro"]:
         if pat.search(loc_text):
-            return "nj_office"
+            return "local_metro"
 
     # 4. NYC metro (hybrid etc.)
-    for pat in _LOC_RE["nyc_metro"]:
+    for pat in _LOC_RE["regional_metro"]:
         if pat.search(loc_text):
-            return "nyc_metro"
+            return "regional_metro"
 
     # 5. US remote
     for pat in _LOC_RE["remote_us"]:
@@ -404,8 +404,8 @@ def _match_positive_signals(text_lo: str) -> list[str]:
     No scoring — just which categories fired. Used for Haiku prompt
     context, diagnostic flag display, and UI chips.
     """
-    matched = 
-    for category, kws in CP.POSITIVE_SIGNALS.items:
+    matched = []
+    for category, kws in CP.POSITIVE_SIGNALS.items():
         if any(kw in text_lo for kw in kws):
             matched.append(category)
     return matched
@@ -432,7 +432,7 @@ def _match_soft_warnings(title_lo: str, text_lo: str,
       - hands_on_coding      : "write production code" / "pair programming"
       - crunch_company       : company is in CRUNCH_COMPANIES list
     """
-    warnings = 
+    warnings = []
 
     if any(kw in title_lo for kw in CP.SOFT_WARNING_TEMP_CONTRACT):
         warnings.append("temp_contract")
@@ -517,8 +517,8 @@ def _detect_track(positive_signals: list[str], industry: str) -> str:
 def _is_dream_company(company_normalized: str, industry_score: int) -> bool:
     """True if company is in COMPANY_INDUSTRY_MAP AND industry score >= 9.
 
-    This matches the original author's explicit dream-tier: gaming_publisher_platform,
-    digital_tcg_ccg, immersive_lbe, gaming_b2b_infrastructure (all 9+).
+    This matches the original author's explicit dream-tier: consumer_platform,
+    consumer_marketplace, experiential_venue, platform_infra (all 9+).
     Used for the WATCHLIST_DREAM tier in combined.py — even if Haiku
     scores the specific role low, dream-company roles get surfaced for
     the original author's awareness.
@@ -565,7 +565,7 @@ def prefilter(job: dict, prefs: dict | None = None) -> dict[str, Any]:
     company_normalized = _normalize_company(job)
 
     # ---- Hard disqualifiers (any one → passed=False) ----
-    hard_disqualifiers: list[str] = 
+    hard_disqualifiers: list[str] = []
     first_reason: str | None = None
 
     # (1) Wrong function — IC / wrong-lane title

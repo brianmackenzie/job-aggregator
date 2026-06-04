@@ -54,9 +54,9 @@ def _pick(row: dict, candidates: tuple[str, ...]) -> str:
     # Build a normalized lookup once per row. Coerce non-string values to
     # str — _row_index (int), and any other metadata callers might attach.
     normalized = {
-        (str(k) if k is not None else "").strip.lower:
-        (str(v) if v is not None else "").strip
-        for k, v in row.items
+        (str(k) if k is not None else "").strip().lower():
+        (str(v) if v is not None else "").strip()
+        for k, v in row.items()
     }
     for candidate in candidates:
         v = normalized.get(candidate)
@@ -83,7 +83,7 @@ class ASGCSheetScraper(BaseScraper):
             # as a successful zero-job run rather than an error.
             return
 
-        self._throttle
+        self._throttle()
         resp = requests.get(
             csv_url,
             headers={
@@ -92,7 +92,7 @@ class ASGCSheetScraper(BaseScraper):
             },
             timeout=30,
         )
-        resp.raise_for_status
+        resp.raise_for_status()
 
         # Google's CSV export uses UTF-8 with no BOM. csv.DictReader needs
         # a text stream — wrap the bytes through io.StringIO.

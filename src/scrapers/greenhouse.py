@@ -13,9 +13,9 @@ documented public rate limit, but throttling avoids being blocked.
 
 Error handling:
   - 404 for a slug → company left Greenhouse; logged as warning, not error.
-  - Any other fetch exception re-raised; BaseScraper.scrape_run catches it
+  - Any other fetch exception re-raised; BaseScraper.scrape_run() catches it
     and records an error ScrapeRuns row for this source while continuing.
-  - Per-item parse errors are also caught by BaseScraper.scrape_run.
+  - Per-item parse errors are also caught by BaseScraper.scrape_run().
 """
 import re
 from typing import Iterable, Optional
@@ -41,7 +41,7 @@ def _strip_html(html: str) -> str:
     # of a hand-rolled 5-entity list, so &rsquo; &mdash; &eacute; &quot; etc.
     # don't survive into the stored description + the Haiku prompt.
     text = _html.unescape(text)
-    return re.sub(r"\s+", " ", text).strip
+    return re.sub(r"\s+", " ", text).strip()
 
 
 @register("greenhouse")
@@ -59,7 +59,7 @@ class GreenhouseScraper(BaseScraper):
         """For each Greenhouse company in companies.yaml, fetch all open jobs.
 
         Each yielded payload is a Greenhouse job dict enriched with a
-        `_company_meta` key containing the companies.yaml record. parse
+        `_company_meta` key containing the companies.yaml record. parse()
         uses this to set company name, tier, and industry without a DB lookup.
         """
         companies = load_ats_companies("greenhouse")
@@ -76,7 +76,7 @@ class GreenhouseScraper(BaseScraper):
                 continue  # ats_slug is null — skip (likely a Workday company)
 
             url = f"{self.API_BASE}/{slug}/jobs"
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     url,
@@ -100,8 +100,8 @@ class GreenhouseScraper(BaseScraper):
                         hint="Verify at boards.greenhouse.io/" + slug,
                     )
                     continue
-                resp.raise_for_status
-                data = resp.json
+                resp.raise_for_status()
+                data = resp.json()
             except Exception as exc:
                 # Per the "never hard-fail a scrape run" rule (CLAUDE.md), a
                 # single bad company must NOT kill the other 28. Log + skip
@@ -118,8 +118,8 @@ class GreenhouseScraper(BaseScraper):
                 )
                 continue
 
-            for job in data.get("jobs", ):
-                # Attach company YAML record so parse can read tier / industry.
+            for job in data.get("jobs", []):
+                # Attach company YAML record so parse() can read tier / industry.
                 job["_company_meta"] = company
                 yield job
 
@@ -133,10 +133,10 @@ class GreenhouseScraper(BaseScraper):
           updated_at    → posted_at (Greenhouse may not expose created_at publicly)
           absolute_url  → url
           content       → description (HTML stripped to plain text)
-          _company_meta → enrichment from fetch: name, tier, industry
+          _company_meta → enrichment from fetch(): name, tier, industry
         """
         job_id = payload.get("id")
-        title  = (payload.get("title") or "").strip
+        title  = (payload.get("title") or "").strip()
         if not job_id or not title:
             return None  # Malformed listing — skip silently
 
@@ -154,7 +154,7 @@ class GreenhouseScraper(BaseScraper):
         description = _strip_html(payload.get("content") or "") or None
 
         # Greenhouse returns ISO8601 timestamps in updated_at; canonicalize_posted_at
-        # in BaseScraper.normalize handles the conversion.
+        # in BaseScraper.normalize() handles the conversion.
         posted_at = payload.get("updated_at") or None
 
         return RawJob(
@@ -168,20 +168,20 @@ class GreenhouseScraper(BaseScraper):
             posted_at   = posted_at,
             remote      = None,  # Greenhouse has no structured remote flag; scoring engine infers it
             raw         = {
-                # Pass tier + industry through to the normalize override below.
+                # Pass tier + industry through to the normalize() override below.
                 "company_tier": meta.get("tier"),
                 "industry":     meta.get("industry"),
             },
         )
 
     def normalize(self, job: RawJob) -> dict:
-        """Extend BaseScraper.normalize to inject company_tier.
+        """Extend BaseScraper.normalize() to inject company_tier.
 
         company_tier is used by the scoring engine's modifier stack:
           Tier S → +10,  Tier 1 → +6,  Tier 2 → +3.
         Setting it at scrape time avoids a DynamoDB lookup per job.
         """
-        row = super.normalize(job)
+        row = super().normalize(job)
         if job.raw:
             tier = job.raw.get("company_tier")
             if tier:

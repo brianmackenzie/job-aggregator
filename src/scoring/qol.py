@@ -69,9 +69,9 @@ SALARY_FLOOR        = int(_QOL.get("salary_floor", 175_000))
 POSTED_RECENT_DAYS  = int(_QOL.get("posted_recent_days", 14))
 
 _KW = (_QOL.get("keywords") or {})
-KW_EQUITY      = [k.lower for k in _KW.get("equity", )]
-KW_BENEFITS    = [k.lower for k in _KW.get("benefits", )]
-KW_FLEXIBILITY = [k.lower for k in _KW.get("flexibility", )]
+KW_EQUITY      = [k.lower() for k in _KW.get("equity", [])]
+KW_BENEFITS    = [k.lower() for k in _KW.get("benefits", [])]
+KW_FLEXIBILITY = [k.lower() for k in _KW.get("flexibility", [])]
 
 
 # ---------------------------------------------------------------------
@@ -87,7 +87,7 @@ def _to_int(val) -> Optional[int]:
             return int(val)
         except (ValueError, TypeError):
             return None
-    if isinstance(val, str) and val.strip:
+    if isinstance(val, str) and val.strip():
         try:
             return int(float(val))
         except (ValueError, TypeError):
@@ -129,7 +129,7 @@ def score_qol(job: dict) -> dict:
     # ----- Work mode ----------------------------------------------------
     # Mutually exclusive: remote OR hybrid OR neither.  Onsite/unclear
     # contribute zero on purpose — they're neutral, not negative.
-    work_mode = (job.get("work_mode") or "").lower.strip
+    work_mode = (job.get("work_mode") or "").lower().strip()
     if work_mode == "remote":
         breakdown["work_mode_remote"] = W_REMOTE
     elif work_mode == "hybrid":
@@ -151,7 +151,7 @@ def score_qol(job: dict) -> dict:
         breakdown["posted_recent"] = W_POSTED
 
     # ----- Description keyword scans -----------------------------------
-    desc = (job.get("description") or "").lower
+    desc = (job.get("description") or "").lower()
     if KW_EQUITY and _any_kw(desc, KW_EQUITY):
         breakdown["equity_keywords"] = W_EQUITY
     if KW_BENEFITS and _any_kw(desc, KW_BENEFITS):
@@ -159,5 +159,5 @@ def score_qol(job: dict) -> dict:
     if KW_FLEXIBILITY and _any_kw(desc, KW_FLEXIBILITY):
         breakdown["flexibility_keywords"] = W_FLEXIBILITY
 
-    total = min(100, max(0, sum(breakdown.values)))
+    total = min(100, max(0, sum(breakdown.values())))
     return {"score": total, "breakdown": breakdown}

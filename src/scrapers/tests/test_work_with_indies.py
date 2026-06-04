@@ -1,6 +1,6 @@
-"""Tests for src/scrapers/work_with_indies.py — parse against fixture HTML.
+"""Tests for src/scrapers/work_with_indies.py — parse() against fixture HTML.
 
-No HTTP. fetch is exercised by the live smoke test.
+No HTTP. fetch() is exercised by the live smoke test.
 """
 from scrapers.work_with_indies import WorkWithIndiesScraper
 
@@ -55,9 +55,9 @@ def _payload(html: str = _CARD_HTML,
     }
 
 
-def test_parse_canonical_card:
-    s   = WorkWithIndiesScraper
-    raw = s.parse(_payload)
+def test_parse_canonical_card():
+    s   = WorkWithIndiesScraper()
+    raw = s.parse(_payload())
     assert raw is not None
     assert raw.title    == "Executive Producer / Head of Product"
     assert raw.company  == "YoYo Studios"
@@ -69,10 +69,10 @@ def test_parse_canonical_card:
                        "yoyo-studios-executive-producer-head-of-product")
 
 
-def test_parse_country_location_not_remote:
+def test_parse_country_location_not_remote():
     """A bare country name without 'remote'/'anywhere' should NOT
     trigger the remote flag — it might be onsite-in-country."""
-    s   = WorkWithIndiesScraper
+    s   = WorkWithIndiesScraper()
     raw = s.parse(_payload(html=_CARD_HTML_US,
                             href="/careers/armor-games-studios-junior-marketing-associate"))
     assert raw is not None
@@ -82,7 +82,7 @@ def test_parse_country_location_not_remote:
     assert raw.remote is None
 
 
-def test_parse_falls_back_to_first_bold_when_no_logo:
+def test_parse_falls_back_to_first_bold_when_no_logo():
     """If the company logo img is missing, the first .bold text wins."""
     no_logo = """
     <a class="job-card" href="/careers/x">
@@ -93,7 +93,7 @@ def test_parse_falls_back_to_first_bold_when_no_logo:
       </div>
     </a>
     """
-    s   = WorkWithIndiesScraper
+    s   = WorkWithIndiesScraper()
     raw = s.parse(_payload(html=no_logo, href="/careers/x"))
     assert raw is not None
     assert raw.company == "Acme Studios"
@@ -101,8 +101,8 @@ def test_parse_falls_back_to_first_bold_when_no_logo:
     assert raw.location == "Berlin"
 
 
-def test_parse_skips_when_no_title:
-    s = WorkWithIndiesScraper
+def test_parse_skips_when_no_title():
+    s = WorkWithIndiesScraper()
     no_title = """
     <a class="job-card" href="/careers/x">
       <img alt="Acme" class="company-logo"/>
@@ -112,8 +112,8 @@ def test_parse_skips_when_no_title:
     assert s.parse(_payload(html=no_title, href="/careers/x")) is None
 
 
-def test_parse_skips_when_no_company:
-    s = WorkWithIndiesScraper
+def test_parse_skips_when_no_company():
+    s = WorkWithIndiesScraper()
     no_company = """
     <a class="job-card" href="/careers/x">
       <div class="text-block-28">Lead Designer</div>
@@ -122,6 +122,6 @@ def test_parse_skips_when_no_company:
     assert s.parse(_payload(html=no_company, href="/careers/x")) is None
 
 
-def test_parse_skips_when_href_blank:
-    s = WorkWithIndiesScraper
+def test_parse_skips_when_href_blank():
+    s = WorkWithIndiesScraper()
     assert s.parse({"_href": "", "_url": "", "_html": _CARD_HTML}) is None

@@ -1,13 +1,13 @@
-"""Tests for src/scrapers/games_jobs_direct.py — parse against fixture HTML.
+"""Tests for src/scrapers/games_jobs_direct.py — parse() against fixture HTML.
 
-No HTTP. fetch is exercised by the live smoke test.
+No HTTP. fetch() is exercised by the live smoke test.
 """
 from scrapers.games_jobs_direct import GamesJobsDirectScraper
 
 
 # Live-shape fixture from a real 2026-04 listing payload (Bitmap Bureau card).
 # The site stores company name inside the LOGO div's title attribute as
-# "Posted by <Company>" — a quirky shape we strip in parse.
+# "Posted by <Company>" — a quirky shape we strip in parse().
 _CARD_HTML = """
 <a href="/job/bitmap-bureau-ltd/senior-programmer/336631">
   <h4 class="job-title">Senior Programmer</h4>
@@ -54,9 +54,9 @@ def _payload(html: str = _CARD_HTML,
     }
 
 
-def test_parse_canonical_card:
-    s   = GamesJobsDirectScraper
-    raw = s.parse(_payload)
+def test_parse_canonical_card():
+    s   = GamesJobsDirectScraper()
+    raw = s.parse(_payload())
     assert raw is not None
     assert raw.title    == "Senior Programmer"
     # "Posted by " prefix must be stripped.
@@ -69,9 +69,9 @@ def test_parse_canonical_card:
     assert "Bitmap Bureau" in raw.description
 
 
-def test_parse_remote_inferred_from_description:
+def test_parse_remote_inferred_from_description():
     """The site has no structured remote field; we scan location + desc."""
-    s   = GamesJobsDirectScraper
+    s   = GamesJobsDirectScraper()
     raw = s.parse(_payload(html=_CARD_HTML_REMOTE_DESC,
                             href="/job/acme/director-of-engineering/123456"))
     assert raw is not None
@@ -80,10 +80,10 @@ def test_parse_remote_inferred_from_description:
     assert raw.remote is True
 
 
-def test_parse_falls_back_to_url_slug_when_no_logo_title:
+def test_parse_falls_back_to_url_slug_when_no_logo_title():
     """If the logo div is missing/has no title attr, un-slugify the
     recruiter segment of the URL."""
-    s   = GamesJobsDirectScraper
+    s   = GamesJobsDirectScraper()
     raw = s.parse(_payload(html=_CARD_HTML_NO_LOGO_TITLE,
                             href="/job/some-recruiter-name/lead-artist/555555"))
     assert raw is not None
@@ -92,14 +92,14 @@ def test_parse_falls_back_to_url_slug_when_no_logo_title:
     assert raw.title   == "Lead Artist"
 
 
-def test_parse_skips_when_no_title:
+def test_parse_skips_when_no_title():
     no_title = """
     <a href="/job/x/y/1"><div title="Posted by Acme"></div></a>
     """
-    s = GamesJobsDirectScraper
+    s = GamesJobsDirectScraper()
     assert s.parse(_payload(html=no_title, href="/job/x/y/1")) is None
 
 
-def test_parse_skips_when_href_blank:
-    s = GamesJobsDirectScraper
+def test_parse_skips_when_href_blank():
+    s = GamesJobsDirectScraper()
     assert s.parse({"_href": "", "_url": "", "_html": _CARD_HTML}) is None

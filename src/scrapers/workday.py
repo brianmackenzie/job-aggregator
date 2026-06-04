@@ -84,12 +84,12 @@ def _parse_posted_on(s: str) -> Optional[str]:
     Workday list payloads carry strings like "Posted Today",
     "Posted Yesterday", "Posted 5 Days Ago", "Posted 30+ Days Ago".
     We approximate (today, today-1d, today-5d, today-30d). Returns None
-    if the format is unrecognized so canonicalize_posted_at in
-    BaseScraper.normalize falls back to the scrape-run timestamp.
+    if the format is unrecognized so canonicalize_posted_at() in
+    BaseScraper.normalize() falls back to the scrape-run timestamp.
     """
     if not s:
         return None
-    low = s.strip.lower
+    low = s.strip().lower()
     if "today" in low:
         delta_days = 0
     elif "yesterday" in low:
@@ -147,7 +147,7 @@ def fetch_workday_description(
         log.warn("workday_detail_status", url=detail_url, status=resp.status_code)
         return None
     try:
-        data = resp.json
+        data = resp.json()
     except Exception as exc:
         log.warn("workday_detail_json_failed", url=detail_url, error=str(exc))
         return None
@@ -182,7 +182,7 @@ class WorkdayScraper(BaseScraper):
 
         Each yielded dict is the raw Workday `jobPostings` entry plus two
         enrichment keys: `_company_meta` (the companies.yaml record) and
-        `_workday` (base_url / tenant / site so parse can build the
+        `_workday` (base_url / tenant / site so parse() can build the
         click-through URL without re-reading the YAML).
         """
         # Per-run detail-fetch budget (see _DEFAULT_MAX_DETAIL_FETCHES).
@@ -250,7 +250,7 @@ class WorkdayScraper(BaseScraper):
         seen   = 0
 
         while seen < max_jobs:
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.post(
                     endpoint,
@@ -304,7 +304,7 @@ class WorkdayScraper(BaseScraper):
                 return
 
             try:
-                data = resp.json
+                data = resp.json()
             except Exception as exc:
                 log.warn(
                     "workday_json_decode_failed",
@@ -314,13 +314,13 @@ class WorkdayScraper(BaseScraper):
                 )
                 return
 
-            postings = data.get("jobPostings") or 
+            postings = data.get("jobPostings") or []
             if not postings:
                 # Reached the end of the tenant's listings.
                 return
 
             for posting in postings:
-                # Enrich each posting so parse doesn't need the YAML.
+                # Enrich each posting so parse() doesn't need the YAML.
                 posting["_company_meta"] = company
                 posting["_workday"] = {
                     "base_url": base_url,
@@ -329,12 +329,12 @@ class WorkdayScraper(BaseScraper):
                 }
                 # Detail-page description (bonus signal for QoL + semantic).
                 # Bounded per run; throttled like any other request. Counter
-                # is initialised in fetch; getattr keeps direct unit-test
-                # calls of _page_through safe.
+                # is initialised in fetch(); getattr keeps direct unit-test
+                # calls of _page_through() safe.
                 fetched = getattr(self, "_detail_fetches", 0)
                 ext = posting.get("externalPath") or ""
                 if self.fetch_descriptions and ext and fetched < _DEFAULT_MAX_DETAIL_FETCHES:
-                    self._throttle
+                    self._throttle()
                     self._detail_fetches = fetched + 1
                     posting["_description"] = fetch_workday_description(
                         base_url, tenant, site, ext, headers,
@@ -365,7 +365,7 @@ class WorkdayScraper(BaseScraper):
           bulletFields[0]→ requisition ID like "R12345" — preferred native_id
           postedOn       → relative "Posted X Days Ago" → ISO8601 approximation
         """
-        title         = (payload.get("title") or "").strip
+        title         = (payload.get("title") or "").strip()
         external_path = payload.get("externalPath") or ""
         if not title or not external_path:
             return None
@@ -381,8 +381,8 @@ class WorkdayScraper(BaseScraper):
         # Prefer Workday's req-ID as the native_id — it's what the company
         # itself uses internally and won't change if the title is edited.
         # Fallback: the terminal segment of externalPath (e.g. "Vice-…_R123").
-        bullets = payload.get("bulletFields") or 
-        req_id  = (bullets[0].strip if bullets and isinstance(bullets[0], str) else "")
+        bullets = payload.get("bulletFields") or []
+        req_id  = (bullets[0].strip() if bullets and isinstance(bullets[0], str) else "")
         if not req_id:
             req_id = external_path.rsplit("/", 1)[-1] or external_path
         # tenant-prefix to prevent collisions if two tenants ever issue the
@@ -393,7 +393,7 @@ class WorkdayScraper(BaseScraper):
         # so the URL is the same one a browser would land on.
         url = f"{base_url}/{site}{external_path}" if base_url and site else ""
 
-        location  = (payload.get("locationsText") or "").strip or None
+        location  = (payload.get("locationsText") or "").strip() or None
         posted_at = _parse_posted_on(payload.get("postedOn") or "")
 
         return RawJob(
@@ -402,7 +402,7 @@ class WorkdayScraper(BaseScraper):
             company     = company_name,
             url         = url,
             location    = location,
-            # Populated by _page_through via fetch_workday_description when
+            # Populated by _page_through via fetch_workday_description() when
             # fetch_descriptions is on; None if disabled / capped / failed.
             description = payload.get("_description"),
             posted_at   = posted_at,
@@ -416,7 +416,7 @@ class WorkdayScraper(BaseScraper):
     def normalize(self, job: RawJob) -> dict:
         """Inject company_tier so the scoring modifier stack picks it up.
         Mirrors the override in greenhouse.py / lever.py / ashby.py."""
-        row = super.normalize(job)
+        row = super().normalize(job)
         if job.raw:
             tier = job.raw.get("company_tier")
             if tier:

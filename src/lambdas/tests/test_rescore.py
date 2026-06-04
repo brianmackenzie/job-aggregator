@@ -66,8 +66,8 @@ def test_api_failure_skips_update_and_increments_counter(aws):
         "tier":               "T4",
         "track":              "exec_target",
         "breakdown":          {"function": 5},
-        "gates_triggered":    ,
-        "modifiers_applied":  ,
+        "gates_triggered":    [],
+        "modifiers_applied":  [],
         "algo_score":         50,
         "semantic_score":     None,
         "semantic_rationale": None,
@@ -108,7 +108,7 @@ def test_api_failure_does_not_abort_batch(aws):
         if jid == "test:row-b":
             return {
                 "score": 50, "tier": "T4", "track": "exec_target",
-                "breakdown": {}, "gates_triggered": , "modifiers_applied": ,
+                "breakdown": {}, "gates_triggered": [], "modifiers_applied": [],
                 "algo_score": 50,
                 "semantic_score": None, "semantic_rationale": None,
                 "semantic_scored_at": None, "semantic_model": None,
@@ -117,8 +117,8 @@ def test_api_failure_does_not_abort_batch(aws):
             }
         return {
             "score": 88, "tier": "T2", "track": "exec_target",
-            "breakdown": {"function": 9}, "gates_triggered": ,
-            "modifiers_applied": , "algo_score": 70,
+            "breakdown": {"function": 9}, "gates_triggered": [],
+            "modifiers_applied": [], "algo_score": 70,
             "semantic_score": 100, "semantic_rationale": "Great fit.",
             "semantic_scored_at": "2026-04-18T00:00:00Z",
             "semantic_model": "claude-haiku-test",
@@ -152,8 +152,8 @@ def test_happy_path_writes_blended_score(aws):
         "tier":               "T2",
         "track":              "exec_target",
         "breakdown":          {"function": 10, "industry": 8},
-        "gates_triggered":    ,
-        "modifiers_applied":  ,
+        "gates_triggered":    [],
+        "modifiers_applied":  [],
         "algo_score":         70,
         "semantic_score":     100,
         "semantic_rationale": "Strong VP target.",
@@ -195,7 +195,7 @@ def test_min_age_hours_skips_fresh_rows(aws):
     with patch("lambdas.rescore.score_combined") as m:
         result = rescore.handler({"min_age_hours": 1.0}, None)
 
-    m.assert_not_called
+    m.assert_not_called()
     assert result["total"] == 1
     assert result["skipped"] == 1
     assert result["updated"] == 0
@@ -215,8 +215,8 @@ def _unchanged_result(rationale: str = "REWRITTEN by rescore") -> dict:
         "tier":               "T2",
         "track":              "exec_target", # == _make_job default
         "breakdown":          {"function": 8},
-        "gates_triggered":    ,
-        "modifiers_applied":  ,
+        "gates_triggered":    [],
+        "modifiers_applied":  [],
         "algo_score":         50,
         "semantic_score":     90,
         "semantic_rationale": rationale,
@@ -252,7 +252,7 @@ def test_changed_score_still_writes(aws):
     """Regression pin: when the score DOES move, the skip gate must not
     fire — the row is written normally."""
     db.put_job(_make_job("test:moved"))  # stored score=82
-    moved = _unchanged_result
+    moved = _unchanged_result()
     moved["score"] = 91                   # score moved 82 -> 91
 
     with patch("lambdas.rescore.score_combined", return_value=moved):
@@ -297,7 +297,7 @@ def test_dry_run_never_skips_or_writes(aws):
     db.put_job(_make_job("test:dry"))
 
     with patch("lambdas.rescore.score_combined",
-               return_value=_unchanged_result):
+               return_value=_unchanged_result()):
         result = rescore.handler({"dry_run": True}, None)
 
     assert result["total"] == 1

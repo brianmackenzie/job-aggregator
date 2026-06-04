@@ -1,10 +1,10 @@
 // Cross-page helpers shared by every page.
 //
-// Renders the bottom nav, exposes a toast helper, provides small text
+// Renders the bottom nav, exposes a toast() helper, provides small text
 // utilities, and ships a tappable score-badge → breakdown-modal flow.
 // Loaded BEFORE every page-specific script.
 
-(function  {
+(function () {
   // ----- Escape user-controlled text before injecting into HTML -----
   // Always run user/source-supplied strings (titles, companies, messages)
   // through this before string-templating into innerHTML.
@@ -34,8 +34,8 @@
     // a synthetic timestamp at "now" which would otherwise show today's
     // hh:mm and look misleading.
     const d = new Date(iso.length > 10 ? iso : iso + 'T00:00:00Z');
-    if (isNaN(d.getTime)) return '';
-    const now = new Date;
+    if (isNaN(d.getTime())) return '';
+    const now = new Date();
     const days = Math.round((now - d) / 86400000);
     if (days <= 0)  return 'today';
     if (days === 1) return '1d ago';
@@ -53,7 +53,7 @@
     { href: '/health.html',   label: 'Health'   },
     { href: '/settings.html', label: 'Settings' },
   ];
-  window.renderBottomNav = function  {
+  window.renderBottomNav = function () {
     const path = location.pathname;
     // "/" should map to "/index.html" so the browse tab is highlighted.
     const here = path === '/' ? '/index.html' : path;
@@ -68,7 +68,7 @@
   };
 
   // ----- Toast: bottom-anchored ephemeral message. -----
-  // Auto-hides after 2.5s. Calling toast while one is visible replaces
+  // Auto-hides after 2.5s. Calling toast() while one is visible replaces
   // it (no queue) — sequential actions overwrite the prior message.
   let _toastTimer = null;
   window.toast = function (msg, opts) {
@@ -85,7 +85,7 @@
     void el.offsetWidth;
     el.classList.add('show');
     clearTimeout(_toastTimer);
-    _toastTimer = setTimeout( => {
+    _toastTimer = setTimeout(() => {
       el.classList.remove('show');
     }, opts.durationMs || 2500);
   };
@@ -102,7 +102,7 @@
       if (v === null || v === undefined || v === '') sp.delete(k);
       else sp.set(k, v);
     }
-    const next = location.pathname + (sp.toString ? '?' + sp : '');
+    const next = location.pathname + (sp.toString() ? '?' + sp : '');
     history.replaceState(null, '', next);
   };
 
@@ -110,7 +110,7 @@
   // Usage: openModal({ title: '...', bodyHtml: '...' });
   // The backdrop click + close button hide it.
   window.openModal = function (opts) {
-    closeModal;   // make sure no prior is left open
+    closeModal();   // make sure no prior is left open
     const back = document.createElement('div');
     back.className = 'modal-backdrop';
     back.id = '_modal_';
@@ -126,21 +126,21 @@
     document.body.appendChild(back);
     // wire close interactions
     back.addEventListener('click', (ev) => {
-      if (ev.target === back || ev.target.matches('[data-close]')) closeModal;
+      if (ev.target === back || ev.target.matches('[data-close]')) closeModal();
     });
     document.addEventListener('keydown', _escClose, { once: true });
     // animate in
     void back.offsetWidth;
     back.classList.add('show');
   };
-  window.closeModal = function  {
+  window.closeModal = function () {
     const back = document.getElementById('_modal_');
     if (!back) return;
     back.classList.remove('show');
-    setTimeout( => back.remove, 200);
+    setTimeout(() => back.remove(), 200);
   };
   function _escClose(ev) {
-    if (ev.key === 'Escape') closeModal;
+    if (ev.key === 'Escape') closeModal();
   }
 
   // ----- Render a single job row (shared between Today + All pages) -----
@@ -157,7 +157,7 @@
   // Values from Haiku's semantic layer: "remote" | "hybrid" | "onsite" | "unclear".
   function workModeChip(mode) {
     if (!mode || mode === 'unclear') return '';
-    const lbl = mode.charAt(0).toUpperCase + mode.slice(1);
+    const lbl = mode.charAt(0).toUpperCase() + mode.slice(1);
     return `<span class="work-mode-chip wm-${escapeHtml(mode)}">${escapeHtml(lbl)}</span>`;
   }
 
@@ -165,7 +165,7 @@
     const score = Number.isFinite(j.score) ? j.score : 0;
     const posted = formatPosted(j.posted_at);
     const detailHref = '/job.html?id=' + encodeURIComponent(j.job_id);
-    const company = (j.company || '').trim;
+    const company = (j.company || '').trim();
     const companyHref = company
       ? '/index.html?companies=' + encodeURIComponent(company)
       : null;
@@ -193,8 +193,8 @@
   document.addEventListener('click', async (ev) => {
     const badge = ev.target.closest('[data-score-badge]');
     if (!badge) return;
-    ev.preventDefault;
-    ev.stopPropagation;
+    ev.preventDefault();
+    ev.stopPropagation();
     const row = badge.closest('.job-row');
     if (!row) return;
     const jobId = row.getAttribute('data-job-id');
@@ -248,6 +248,6 @@
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', renderBottomNav);
   } else {
-    renderBottomNav;
+    renderBottomNav();
   }
-});
+})();

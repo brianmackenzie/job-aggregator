@@ -34,7 +34,7 @@ _WHITESPACE_RE = re.compile(r"\s+")
 def _clean(s: str) -> str:
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 @register("hitmarker")
@@ -43,7 +43,7 @@ class HitmarkerScraper(BaseScraper):
     schedule = "cron(30 6 * * ? *)"
     rate_limit_rps = 0.5
     # 2026-06-03: detail-page descriptions (the listing/card omits the JD).
-    # scrape_run fetches RawJob.url + extracts JSON-LD first, then this
+    # scrape_run() fetches RawJob.url + extracts JSON-LD first, then this
     # CSS selector; populates QoL keyword scoring + the semantic pass.
     auto_fetch_description = True
     _DESC_SELECTOR = 'div.prose'
@@ -59,10 +59,10 @@ class HitmarkerScraper(BaseScraper):
         cfg = load_source_config(self.source_name)
         max_pages = int(cfg.get("max_pages") or self.DEFAULT_MAX_PAGES)
 
-        seen_hrefs: set[str] = set
+        seen_hrefs: set[str] = set()
         for page in range(1, max_pages + 1):
             url = self.LIST_URL if page == 1 else f"{self.LIST_URL}?page={page}"
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     url,
@@ -72,7 +72,7 @@ class HitmarkerScraper(BaseScraper):
                     },
                     timeout=30,
                 )
-                resp.raise_for_status
+                resp.raise_for_status()
             except requests.RequestException:
                 break
 
@@ -146,7 +146,7 @@ class HitmarkerScraper(BaseScraper):
             if not text or text == title or len(text) > 80:
                 continue
             looks_like_location = (
-                "remote" in text.lower
+                "remote" in text.lower()
                 or re.search(r",\s*[A-Z]{2}\b", text)
                 or re.search(r",\s*[A-Z][a-z]+", text)        # e.g. ", United Kingdom"
             )
@@ -168,7 +168,7 @@ class HitmarkerScraper(BaseScraper):
 
         remote = None
         if location:
-            lower = location.lower
+            lower = location.lower()
             if "remote" in lower:
                 remote = True
             elif "onsite" in lower or "on-site" in lower:

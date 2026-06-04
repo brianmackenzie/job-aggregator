@@ -42,9 +42,9 @@ def _json(status: int, body: Any) -> dict:
 
 
 def handler(event, context):
-    by_band:    Counter = Counter
-    by_track:   Counter = Counter
-    by_source:  Counter = Counter
+    by_band:    Counter = Counter()
+    by_track:   Counter = Counter()
+    by_source:  Counter = Counter()
     total = 0
 
     cursor = None
@@ -86,6 +86,6 @@ def handler(event, context):
         "ok": True,
         "total_active": total,
         "by_band":   dict(by_band),
-        "by_track":  dict(by_track.most_common),
-        "by_source": dict(by_source.most_common),
+        "by_track":  dict(by_track.most_common()),
+        "by_source": dict(by_source.most_common()),
     })

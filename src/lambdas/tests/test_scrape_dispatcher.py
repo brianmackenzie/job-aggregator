@@ -1,7 +1,7 @@
 """Tests for src/lambdas/scrape_dispatcher.py.
 
 Mocks the Lambda client so no real invoke happens; we just verify
-the dispatcher calls invoke with the expected payload.
+the dispatcher calls invoke() with the expected payload.
 """
 import json
 from unittest.mock import MagicMock
@@ -17,7 +17,7 @@ def mock_lambda(monkeypatch):
     monkeypatch.setenv("SCRAPE_WORKER_FN_NAME", "test-worker")
     # Force re-read of the env var the module captured at import time.
     monkeypatch.setattr(scrape_dispatcher, "_WORKER_FN", "test-worker")
-    mock = MagicMock
+    mock = MagicMock()
     monkeypatch.setattr(scrape_dispatcher, "_lambda", mock)
     return mock
 
@@ -34,7 +34,7 @@ def test_http_path_invokes_worker(mock_lambda):
     body = json.loads(resp["body"])
     assert body["invoked"] == "remoteok"
 
-    mock_lambda.invoke.assert_called_once
+    mock_lambda.invoke.assert_called_once()
     call = mock_lambda.invoke.call_args.kwargs
     assert call["FunctionName"] == "test-worker"
     assert call["InvocationType"] == "Event"
@@ -45,7 +45,7 @@ def test_http_path_missing_source_returns_400(mock_lambda):
     event = {"routeKey": "POST /api/scrape/{source}", "pathParameters": {}}
     resp = scrape_dispatcher.handler(event, None)
     assert resp["statusCode"] == 400
-    mock_lambda.invoke.assert_not_called
+    mock_lambda.invoke.assert_not_called()
 
 
 # ----- Scheduled path ------------------------------------------------------
@@ -55,7 +55,7 @@ def test_scheduled_fanout_invokes_all(mock_lambda):
     resp = scrape_dispatcher.handler(event, None)
     assert resp["ok"] is True
     assert resp["invoked"] == ["remoteok", "himalayas", "hnhiring"]
-    assert resp["failed"] == 
+    assert resp["failed"] == []
     assert mock_lambda.invoke.call_count == 3
 
 
@@ -83,9 +83,9 @@ def test_scheduled_one_failure_does_not_stop_others(mock_lambda):
 
 
 def test_scheduled_empty_sources_is_ok(mock_lambda):
-    resp = scrape_dispatcher.handler({"sources": }, None)
-    assert resp["invoked"] == 
-    mock_lambda.invoke.assert_not_called
+    resp = scrape_dispatcher.handler({"sources": []}, None)
+    assert resp["invoked"] == []
+    mock_lambda.invoke.assert_not_called()
 
 
 def test_scheduled_bad_event_shape(mock_lambda):

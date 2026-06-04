@@ -49,7 +49,7 @@ _ID_RE = re.compile(r"/Joboffer/(\d+)")
 def _clean(s: str) -> str:
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 def _itemprop_text(soup: BeautifulSoup, prop: str) -> str:
@@ -79,17 +79,17 @@ class GamesCareerScraper(BaseScraper):
         cfg = load_source_config(self.source_name)
         max_pages = int(cfg.get("max_pages") or self.DEFAULT_MAX_PAGES)
 
-        seen_ids: set[str] = set
+        seen_ids: set[str] = set()
         for page in range(1, max_pages + 1):
             url = self.LIST_URL if page == 1 else self.PAGED_URL.format(page=page)
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     url,
                     headers={"User-Agent": self.USER_AGENT, "Accept": "text/html"},
                     timeout=30,
                 )
-                resp.raise_for_status
+                resp.raise_for_status()
             except requests.RequestException:
                 # Stop pagination on network blip; don't fail the run.
                 break
@@ -182,7 +182,7 @@ class GamesCareerScraper(BaseScraper):
         # Remote inference: location string contains "remote" (e.g. when the
         # site marks roles as "Worldwide / Remote"). Otherwise leave None.
         remote = None
-        if location and "remote" in location.lower:
+        if location and "remote" in location.lower():
             remote = True
 
         return RawJob(

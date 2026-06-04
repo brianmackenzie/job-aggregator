@@ -65,9 +65,9 @@ def _payload(html: str = _CARD_HTML, native_id: str = "33669"):
     }
 
 
-def test_parse_canonical_card:
-    s   = GamesCareerScraper
-    raw = s.parse(_payload)
+def test_parse_canonical_card():
+    s   = GamesCareerScraper()
+    raw = s.parse(_payload())
     assert raw is not None
     assert raw.native_id == "33669"
     assert raw.title     == "AI Video Artist - Marketing"
@@ -78,8 +78,8 @@ def test_parse_canonical_card:
     assert raw.remote is None
 
 
-def test_parse_remote_inferred_from_country:
-    s   = GamesCareerScraper
+def test_parse_remote_inferred_from_country():
+    s   = GamesCareerScraper()
     raw = s.parse(_payload(html=_CARD_HTML_REMOTE, native_id="33810"))
     assert raw is not None
     assert raw.title    == "VP, Engineering"
@@ -87,8 +87,8 @@ def test_parse_remote_inferred_from_country:
     assert raw.remote is True
 
 
-def test_parse_skips_when_no_company:
-    s = GamesCareerScraper
+def test_parse_skips_when_no_company():
+    s = GamesCareerScraper()
     no_co = """
     <div class="joblist_element_title">
       <h3 itemprop="title"><a href="/Joboffer/1_x">Director</a></h3>
@@ -97,8 +97,8 @@ def test_parse_skips_when_no_company:
     assert s.parse(_payload(html=no_co, native_id="1")) is None
 
 
-def test_parse_skips_when_no_title:
-    s = GamesCareerScraper
+def test_parse_skips_when_no_title():
+    s = GamesCareerScraper()
     no_title = """
     <div class="joblist_element_title">
       <td itemprop="hiringOrganization"><span itemprop="name">Acme</span></td>
@@ -107,8 +107,8 @@ def test_parse_skips_when_no_title:
     assert s.parse(_payload(html=no_title, native_id="2")) is None
 
 
-def test_parse_falls_back_to_country_only_when_no_city:
-    s = GamesCareerScraper
+def test_parse_falls_back_to_country_only_when_no_city():
+    s = GamesCareerScraper()
     country_only = """
     <div class="joblist_element_title">
       <h3 itemprop="title"><a>Producer</a></h3>
@@ -123,8 +123,8 @@ def test_parse_falls_back_to_country_only_when_no_city:
     assert raw.location == "Germany"
 
 
-def test_parse_handles_missing_date:
-    s = GamesCareerScraper
+def test_parse_handles_missing_date():
+    s = GamesCareerScraper()
     no_date = """
     <div class="joblist_element_title">
       <h3 itemprop="title"><a>Designer</a></h3>

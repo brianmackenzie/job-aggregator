@@ -1,4 +1,4 @@
-"""Tests for src/scrapers/builtinnyc.py — parse against fixture HTML."""
+"""Tests for src/scrapers/builtinnyc.py — parse() against fixture HTML."""
 from scrapers.builtinnyc import BuiltInNYCScraper
 
 
@@ -35,9 +35,9 @@ def _payload(html: str = _CARD, href: str = "/job/director-of-eng-12345"):
     }
 
 
-def test_parse_canonical_card:
-    s   = BuiltInNYCScraper
-    raw = s.parse(_payload)
+def test_parse_canonical_card():
+    s   = BuiltInNYCScraper()
+    raw = s.parse(_payload())
     assert raw is not None
     assert raw.title     == "Director of Engineering"
     assert raw.company   == "ExampleSports"
@@ -47,32 +47,32 @@ def test_parse_canonical_card:
     assert raw.remote is None
 
 
-def test_parse_remote_inferred:
-    s   = BuiltInNYCScraper
+def test_parse_remote_inferred():
+    s   = BuiltInNYCScraper()
     raw = s.parse(_payload(html=_CARD_REMOTE,
                             href="/job/vp-platform-67890"))
     assert raw is not None
     assert raw.remote is True
 
 
-def test_parse_inoffice_inferred:
-    s   = BuiltInNYCScraper
+def test_parse_inoffice_inferred():
+    s   = BuiltInNYCScraper()
     raw = s.parse(_payload(html=_CARD_INOFFICE,
                             href="/job/lead-designer-99999"))
     assert raw is not None
     assert raw.remote is False
 
 
-def test_parse_skips_when_no_company:
-    s = BuiltInNYCScraper
+def test_parse_skips_when_no_company():
+    s = BuiltInNYCScraper()
     no_company = """
     <div><h2>Director</h2><span class="location-text">NYC</span></div>
     """
     assert s.parse(_payload(html=no_company, href="/job/x")) is None
 
 
-def test_parse_skips_when_href_blank:
-    s = BuiltInNYCScraper
+def test_parse_skips_when_href_blank():
+    s = BuiltInNYCScraper()
     assert s.parse({"_href": "", "_url": "", "_html": _CARD}) is None
 
 
@@ -130,9 +130,9 @@ _LIVE_CARD_HTML = """
 """
 
 
-def test_parse_live_builtinnyc_card_shape:
+def test_parse_live_builtinnyc_card_shape():
     """Locked-in fixture from a real 2026-04 listing payload."""
-    s   = BuiltInNYCScraper
+    s   = BuiltInNYCScraper()
     raw = s.parse({
         "_href": "/job/corporate-vice-president-nyl-com-product-management-institutional-audiences/9093232",
         "_url":  "https://www.builtinnyc.com/job/corporate-vice-president-nyl-com-product-management-institutional-audiences/9093232",
@@ -150,7 +150,7 @@ def test_parse_live_builtinnyc_card_shape:
     assert raw.native_id == "9093232"
 
 
-def test_parse_live_builtinnyc_company_falls_back_to_logo_alt:
+def test_parse_live_builtinnyc_company_falls_back_to_logo_alt():
     """If the data-id="company-title" anchor is missing, strip ' Logo' from
     the company img alt text."""
     html = """
@@ -159,7 +159,7 @@ def test_parse_live_builtinnyc_company_falls_back_to_logo_alt:
       <a data-id="job-card-title" href="/job/x">Engineer</a>
     </div>
     """
-    s   = BuiltInNYCScraper
+    s   = BuiltInNYCScraper()
     raw = s.parse({
         "_href": "/job/x",
         "_url":  "https://www.builtinnyc.com/job/x",

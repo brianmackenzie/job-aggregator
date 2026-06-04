@@ -47,7 +47,7 @@ _MODE_TOKENS   = ("Remote", "Hybrid", "Onsite")
 def _clean(s: str) -> str:
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 @register("game_jobs_uk")
@@ -81,9 +81,9 @@ class GameJobsUKScraper(BaseScraper):
         cfg = load_source_config(self.source_name)
         max_pages = int(cfg.get("max_pages") or self.DEFAULT_MAX_PAGES)
 
-        seen_ids: set[str] = set
+        seen_ids: set[str] = set()
         for page in range(0, max_pages):    # page 0 = initial HTML
-            self._throttle
+            self._throttle()
             try:
                 if page == 0:
                     resp = requests.get(
@@ -105,7 +105,7 @@ class GameJobsUKScraper(BaseScraper):
                         params={"offset": page * self.PAGE_SIZE},
                         timeout=30,
                     )
-                resp.raise_for_status
+                resp.raise_for_status()
             except requests.RequestException:
                 break
 
@@ -141,7 +141,7 @@ class GameJobsUKScraper(BaseScraper):
         The description lives in `div.rich-text-content`. Throttled like any
         request; best-effort (any error / missing selector -> None).
         """
-        self._throttle
+        self._throttle()
         try:
             resp = requests.get(
                 detail_url,
@@ -152,7 +152,7 @@ class GameJobsUKScraper(BaseScraper):
                 },
                 timeout=30,
             )
-            resp.raise_for_status
+            resp.raise_for_status()
         except requests.RequestException:
             return None
         el = BeautifulSoup(resp.text, "html.parser").select_one(self._DESC_SELECTOR)
@@ -178,7 +178,7 @@ class GameJobsUKScraper(BaseScraper):
         # like a location (contains " - " AND is < 60 chars).
         location = None
         for span in soup.find_all("span"):
-            classes = span.get("class") or 
+            classes = span.get("class") or []
             if classes:
                 continue   # all our location <span>s are class-less
             text = _clean(span.get_text(" ", strip=True))
@@ -204,7 +204,7 @@ class GameJobsUKScraper(BaseScraper):
         if date_node:
             m = _DATE_RE.match(_clean(date_node.get_text(strip=True)))
             if m:
-                dd, mm, yyyy = m.groups
+                dd, mm, yyyy = m.groups()
                 posted_at = f"{yyyy}-{mm}-{dd}T00:00:00Z"
 
         if not title or not company:
@@ -218,7 +218,7 @@ class GameJobsUKScraper(BaseScraper):
         elif mode == "Onsite":
             remote = False
         # Mode "Hybrid" → leave None (algo treats unknown as neutral).
-        if remote is None and location and "remote" in location.lower:
+        if remote is None and location and "remote" in location.lower():
             remote = True
 
         return RawJob(

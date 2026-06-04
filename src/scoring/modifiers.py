@@ -1,4 +1,4 @@
-"""
+# ===================================================================
 # PERSONAL PROFILE DATA — REPLACE BEFORE USING AT SCALE
 #
 # This module contains constants that encode the ORIGINAL AUTHOR'S
@@ -14,7 +14,7 @@
 #      your own geography, industry keywords, and company lists.
 #
 # See `docs/FORKING.md` for a file-by-file guide.
-"""
+# ===================================================================
 
 """Additive modifier stack — bonuses and penalties applied after the
 weighted category sum is converted to 0-100.
@@ -37,15 +37,15 @@ from .keywords import (
     KW_CRUNCH_PACE,
     KW_D2C_PAYMENTS,
     KW_HANDS_ON_CODE,
-    KW_IMMERSIVE,
-    KW_CCG,
+    KW_EXPERIENTIAL,
+    KW_MARKETPLACE_SIG,
     KW_MA_INTEGRATION,
-    KW_NJ_OFFICE,
+    KW_LOCAL_METRO,
     MODIFIERS_CFG,
     any_match,
     keyword_hits,
     regex_match,
-    LOC_NJ_RE,
+    LOC_LOCAL_RE,
     LOC_REMOTE_RE,
 )
 
@@ -73,7 +73,7 @@ def _mod_company_tier(job: dict) -> tuple[bool, str, int]:
 
     Tier values expected: "1", "2", "S" (case-insensitive).
     """
-    tier = str(job.get("company_tier", "") or "").upper.strip
+    tier = str(job.get("company_tier", "") or "").upper().strip()
     if tier == "S":
         return True, "company_tier_s", _delta("company_tier_s")
     if tier == "1":
@@ -83,25 +83,25 @@ def _mod_company_tier(job: dict) -> tuple[bool, str, int]:
     return False, "", 0
 
 
-def _mod_immersive(text: str, industry: str) -> tuple[bool, str, int]:
+def _mod_experiential(text: str, industry: str) -> tuple[bool, str, int]:
     """Bonus for immersive / themed-entertainment / escape-room content
-    AT a company actually classified as immersive_lbe.
+    AT a company actually classified as experiential_venue.
 
     keyword-only matching was promoting brand-experience
     agencies, ad-agency "experiential" roles, and any JD that mentioned "VR"
     or "immersive media" up by +8. The gate now also checks the algo industry
     classifier — only roles whose company_industry_map / industry_keywords
-    fallback resolved to immersive_lbe receive the bonus. The required
+    fallback resolved to experiential_venue receive the bonus. The required
     industries are read from scoring.yaml::modifiers.immersive_themed.
     requires_industry so they can be expanded without a code change.
     """
-    target_industries = _cfg("immersive_themed").get("requires_industry", )
+    target_industries = _cfg("immersive_themed").get("requires_industry", [])
     if not target_industries:
-        target_industries = ["immersive_lbe"]
+        target_industries = ["experiential_venue"]
     if industry not in target_industries:
         return False, "immersive_themed", 0
 
-    kws = [k.lower for k in _cfg("immersive_themed").get("keywords", )]
+    kws = [k.lower() for k in _cfg("immersive_themed").get("keywords", [])]
     if not kws:
         kws = ["escape room", "immersive", "themed entertainment", "lbe",
                "location-based entertainment"]
@@ -109,22 +109,22 @@ def _mod_immersive(text: str, industry: str) -> tuple[bool, str, int]:
     return fired, "immersive_themed", _delta("immersive_themed") if fired else 0
 
 
-def _mod_tcg(text: str) -> tuple[bool, str, int]:
+def _mod_marketplace(text: str) -> tuple[bool, str, int]:
     """Bonus for trading-card-game / CCG content."""
-    kws = [k.lower for k in _cfg("tcg_ccg").get("keywords", )]
+    kws = [k.lower() for k in _cfg("tcg_ccg").get("keywords", [])]
     if not kws:
         kws = ["trading card game", "tcg", "ccg", "collectible card", "deckbuilding"]
     fired = any_match(text, kws)
     return fired, "tcg_ccg", _delta("tcg_ccg") if fired else 0
 
 
-def _mod_ma_gaming(text: str, industry: str) -> tuple[bool, str, int]:
+def _mod_ma_domain(text: str, industry: str) -> tuple[bool, str, int]:
     """Bonus for M&A integration signals in a gaming/media industry role."""
-    target_industries = _cfg("ma_gaming_media").get("requires_industry", )
+    target_industries = _cfg("ma_gaming_media").get("requires_industry", [])
     if not target_industries:
         target_industries = [
-            "gaming_publisher_platform", "digital_tcg_ccg", "immersive_lbe",
-            "music_tech", "streaming_media", "gaming_b2b_infrastructure",
+            "consumer_platform", "consumer_marketplace", "experiential_venue",
+            "creator_tech", "media_streaming", "platform_infra",
         ]
     ma_hit    = any_match(text, KW_MA_INTEGRATION)
     right_ind = industry in target_industries
@@ -134,38 +134,38 @@ def _mod_ma_gaming(text: str, industry: str) -> tuple[bool, str, int]:
 
 def _mod_vp_analyst(title: str) -> tuple[bool, str, int]:
     """Bonus when title explicitly contains 'VP Analyst' or 'Principal Analyst'."""
-    kws = [k.lower for k in _cfg("vp_analyst").get("title_keywords", )]
+    kws = [k.lower() for k in _cfg("vp_analyst").get("title_keywords", [])]
     if not kws:
         kws = ["vp analyst", "principal analyst", "vp, analyst"]
-    lo_title = title.lower
+    lo_title = title.lower()
     fired = any(kw in lo_title for kw in kws)
     return fired, "vp_analyst", _delta("vp_analyst") if fired else 0
 
 
-def _mod_remote_vp_gaming(job: dict, text: str, industry: str) -> tuple[bool, str, int]:
+def _mod_remote_vp_senior(job: dict, text: str, industry: str) -> tuple[bool, str, int]:
     """Bonus for a remote VP-level role in the gaming industry."""
     is_remote    = (job.get("remote") is True) or regex_match(text, LOC_REMOTE_RE)
-    is_gaming    = industry in ("gaming_publisher_platform", "gaming_b2b_infrastructure",
-                                "digital_tcg_ccg")
-    lo_title     = (job.get("title") or "").lower
+    is_domain    = industry in ("consumer_platform", "platform_infra",
+                                "consumer_marketplace")
+    lo_title     = (job.get("title") or "").lower()
     is_vp        = any(t in lo_title for t in ["vp", "vice president", "head of",
                                                 "chief", "director"])
-    fired = is_remote and is_gaming and is_vp
+    fired = is_remote and is_domain and is_vp
     return fired, "remote_vp_gaming", _delta("remote_vp_gaming") if fired else 0
 
 
-def _mod_nj_office(job: dict, text: str) -> tuple[bool, str, int]:
+def _mod_local_metro(job: dict, text: str) -> tuple[bool, str, int]:
     """Bonus for NJ-based in-office work (commutable from Anytown)."""
-    fired = regex_match(text, LOC_NJ_RE) or any_match(text, KW_NJ_OFFICE)
+    fired = regex_match(text, LOC_LOCAL_RE) or any_match(text, KW_LOCAL_METRO)
     # Don't double-fire if remote — NJ bonus is for in-office commute value.
     if job.get("remote"):
         fired = False
-    return fired, "nj_office_bonus", _delta("nj_office_bonus") if fired else 0
+    return fired, "local_metro_bonus", _delta("local_metro_bonus") if fired else 0
 
 
 def _mod_mental_health(text: str) -> tuple[bool, str, int]:
     """Bonus for mental health or accessibility mission content."""
-    kws = [k.lower for k in _cfg("mental_health_accessibility").get("keywords", )]
+    kws = [k.lower() for k in _cfg("mental_health_accessibility").get("keywords", [])]
     if not kws:
         kws = ["mental health", "accessibility", "accessible gaming", "crisis support",
                "suicide prevention", "disability"]
@@ -173,15 +173,15 @@ def _mod_mental_health(text: str) -> tuple[bool, str, int]:
     return fired, "mental_health_accessibility", _delta("mental_health_accessibility") if fired else 0
 
 
-def _mod_multiplayer_live_service(text: str, industry: str) -> tuple[bool, str, int]:
+def _mod_distributed_systems(text: str, industry: str) -> tuple[bool, str, int]:
     """Bonus for the original author's RARE specialty: multiplayer infrastructure / live services /
     online platform engineering at scale.
 
     Per his resume + cover letter: "My specialization is rare: multiplayer
     infrastructure, live-service platform architecture, and the technology
     strategy that turns engineering complexity into competitive advantage at
-    massive scale." This was demonstrated at Take-Two / 2K Online Engineering
-    (thousands of virtual servers, NBA 2K and WWE 2K matchmaking) and is
+    massive scale." This was demonstrated at a large online-platform engineering org
+    (thousands of virtual servers, NBA a prior employer and WWE a prior employer matchmaking) and is
     his strongest IC-of-leaders signal.
 
     Fires when the JD contains 2+ specialty signals AND the role is in a
@@ -189,13 +189,13 @@ def _mod_multiplayer_live_service(text: str, industry: str) -> tuple[bool, str, 
     SaaS company that happens to mention "live service").
     """
     target_industries = {
-        "gaming_publisher_platform", "gaming_b2b_infrastructure",
-        "digital_tcg_ccg", "immersive_lbe", "streaming_media",
+        "consumer_platform", "platform_infra",
+        "consumer_marketplace", "experiential_venue", "media_streaming",
     }
     if industry not in target_industries:
-        return False, "multiplayer_live_service", 0
+        return False, "distributed_systems", 0
 
-    kws = [k.lower for k in _cfg("multiplayer_live_service").get("keywords", )]
+    kws = [k.lower() for k in _cfg("distributed_systems").get("keywords", [])]
     if not kws:
         kws = [
             "multiplayer infrastructure", "multiplayer backend",
@@ -206,11 +206,11 @@ def _mod_multiplayer_live_service(text: str, industry: str) -> tuple[bool, str, 
             "merchant of record", "subscription platform",
             "post-merger integration", "shared services",
         ]
-    threshold = int(_cfg("multiplayer_live_service").get("keyword_count_threshold", 2))
+    threshold = int(_cfg("distributed_systems").get("keyword_count_threshold", 2))
     hits = keyword_hits(text, kws)
     fired = hits >= threshold
-    return fired, "multiplayer_live_service", \
-        _delta("multiplayer_live_service") if fired else 0
+    return fired, "distributed_systems", \
+        _delta("distributed_systems") if fired else 0
 
 
 def _mod_interim_advisor_fit(title: str) -> tuple[bool, str, int]:
@@ -230,7 +230,7 @@ def _mod_interim_advisor_fit(title: str) -> tuple[bool, str, int]:
     so a "Technical Advisor" IC role doesn't accidentally fire — it requires
     a scope word that matches the original author's lane.
     """
-    lo = title.lower
+    lo = title.lower()
 
     engagement_markers = [
         "interim", "fractional", "advisor", "advisory",
@@ -250,7 +250,7 @@ def _mod_interim_advisor_fit(title: str) -> tuple[bool, str, int]:
 def _mod_hrc_trans(company_normalized: str, text: str) -> tuple[bool, str, int]:
     """Bonus for HRC-100 company with explicit trans-inclusive healthcare mention."""
     is_hrc = company_normalized in HRC100
-    trans_kws = [k.lower for k in _cfg("hrc_trans_inclusive").get("keywords", )]
+    trans_kws = [k.lower() for k in _cfg("hrc_trans_inclusive").get("keywords", [])]
     if not trans_kws:
         trans_kws = ["transgender-inclusive healthcare", "gender-affirming care",
                      "trans-inclusive", "gender affirming"]
@@ -290,7 +290,7 @@ def _mod_crunch_culture(text: str) -> tuple[bool, str, int]:
 def _mod_below_vp(title: str) -> tuple[bool, str, int]:
     """Penalty when the title is Manager / Sr Manager / Associate level.
 
-    the original author targets VP+ roles. A Manager-level role at Roblox (Tier S) shouldn't
+    the original author targets VP+ roles. A Manager-level role at a large platform company (Tier S) shouldn't
     outscore a VP-level role at a less desirable company. The tier bonus can
     inflate Manager-level scores at dream companies; this modifier corrects that.
 
@@ -298,11 +298,11 @@ def _mod_below_vp(title: str) -> tuple[bool, str, int]:
     and does NOT fire when "senior manager" is part of a larger title that
     contains VP/Director (e.g., "VP, Senior Manager" is unusual but possible).
     """
-    lo = title.lower.strip
+    lo = title.lower().strip()
 
     # Skip if Director+ or VP-level exec-track is in the title.
     # NOTE: we DO NOT skip just because the word "principal" appears —
-    # "Principal App Store Manager" at Roblox is still a below-VP role, not
+    # "Principal App Store Manager" at a large platform company is still a below-VP role, not
     # an executive. The engine's _leadership_score separately gives Principal
     # IC titles leadership=1 so the role_fit category already scores low.
     if any(t in lo for t in ["director", "vp ", " vp", "vp,", "vice president",
@@ -342,11 +342,11 @@ def _mod_d2c_in_title(title: str) -> tuple[bool, str, int]:
     resume has some of it). Any title that foregrounds this function should
     take a hard penalty so it can't outscore true strategy/CTO/advisory roles.
     """
-    kws = [k.lower for k in _cfg("d2c_in_title").get("title_keywords", )]
+    kws = [k.lower() for k in _cfg("d2c_in_title").get("title_keywords", [])]
     if not kws:
         kws = ["d2c", " commerce", "payments", "payment", "e-commerce", "ecommerce",
                " ads", "advertising", "performance marketing", "growth marketing"]
-    lo_title = title.lower
+    lo_title = title.lower()
     fired = any(kw in lo_title for kw in kws)
     return fired, "d2c_in_title", _delta("d2c_in_title") if fired else 0
 
@@ -361,7 +361,7 @@ def _mod_temp_contract_title(title: str) -> tuple[bool, str, int]:
     Does NOT fire for "interim", "fractional", "advisor", or "consultant" —
     those are the engagements the original author is actually targeting via TRACK_2_INTERIM.
     """
-    lo = title.lower
+    lo = title.lower()
     # Explicit wrong-shape contractor markers.
     bad_kws = [
         "(temporary)",
@@ -424,7 +424,7 @@ def compute_modifiers(
         job:        The raw job dict (must include 'title', 'company_normalized',
                     optionally 'company_tier', 'remote').
         text:       Pre-built searchable text (title + company + description + location).
-        industry:   Industry bucket string from keywords.detect_industry.
+        industry:   Industry bucket string from keywords.detect_industry().
         geo_score:  Geographic category score (0-10) — used for context.
         cat_scores: Dict of all category scores (not currently used but
                     available for future compound modifiers).
@@ -437,7 +437,7 @@ def compute_modifiers(
     title             = job.get("title", "")
     company_normalized = job.get("company_normalized", "")
 
-    fired_names:  list[str] = 
+    fired_names:  list[str] = []
     total_delta:  int       = 0
 
     # Helper: register a modifier if it fired.
@@ -449,18 +449,18 @@ def compute_modifiers(
 
     # Bonuses
     f, n, d = _mod_company_tier(job);                    _register(f, n, d)
-    f, n, d = _mod_immersive(text, industry);            _register(f, n, d)
-    f, n, d = _mod_tcg(text);                            _register(f, n, d)
-    f, n, d = _mod_ma_gaming(text, industry);            _register(f, n, d)
+    f, n, d = _mod_experiential(text, industry);            _register(f, n, d)
+    f, n, d = _mod_marketplace(text);                            _register(f, n, d)
+    f, n, d = _mod_ma_domain(text, industry);            _register(f, n, d)
     f, n, d = _mod_vp_analyst(title);                    _register(f, n, d)
-    f, n, d = _mod_remote_vp_gaming(job, text, industry); _register(f, n, d)
-    f, n, d = _mod_nj_office(job, text);                 _register(f, n, d)
+    f, n, d = _mod_remote_vp_senior(job, text, industry); _register(f, n, d)
+    f, n, d = _mod_local_metro(job, text);                 _register(f, n, d)
     f, n, d = _mod_mental_health(text);                  _register(f, n, d)
     f, n, d = _mod_hrc_trans(company_normalized, text);  _register(f, n, d)
     # Resume-tuned bonuses:
-    #   - multiplayer_live_service: the original author's rare specialty signal in JD
+    #   - distributed_systems: the original author's rare specialty signal in JD
     #   - interim_advisor_fit:      Track-2/3 engagements (interim/fractional/advisor)
-    f, n, d = _mod_multiplayer_live_service(text, industry); _register(f, n, d)
+    f, n, d = _mod_distributed_systems(text, industry); _register(f, n, d)
     f, n, d = _mod_interim_advisor_fit(title);               _register(f, n, d)
 
     # Penalties

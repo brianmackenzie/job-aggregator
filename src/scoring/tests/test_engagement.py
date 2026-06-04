@@ -201,7 +201,7 @@ class TestPriority:
 class TestLabels:
     def test_every_detection_value_has_a_label(self):
         # The /api/taxonomy endpoint reads ENGAGEMENT_LABELS to populate
-        # the chip rail; every value detect_engagement can return must
+        # the chip rail; every value detect_engagement() can return must
         # have a human-readable label.
         for value in ("fulltime", "contract", "interim_fractional",
                       "advisor", "unclear"):

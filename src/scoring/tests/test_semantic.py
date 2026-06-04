@@ -2,7 +2,7 @@
 
 We never make a real network call here — every test patches
 `scoring.semantic._get_client` to return a fake Anthropic client whose
-`messages.create` returns a hand-crafted Message object. The point is
+`messages.create()` returns a hand-crafted Message object. The point is
 to verify our wiring (request shape, response parsing, error swallowing,
 rate-limit, kill-switch) — NOT to validate Haiku itself.
 
@@ -29,7 +29,7 @@ def _fake_message(text: str) -> SimpleNamespace:
 
 def _fake_client_returning(text: str) -> MagicMock:
     """Construct a MagicMock that mimics anthropic.Anthropic with one canned reply."""
-    client = MagicMock
+    client = MagicMock()
     client.messages.create.return_value = _fake_message(text)
     return client
 
@@ -41,13 +41,13 @@ def _fake_client_returning(text: str) -> MagicMock:
 SAMPLE_JOB = {
     "job_id":            "remoteok:abc",
     "title":             "VP, Platform Engineering",
-    "company":           "Roblox",
-    "company_normalized": "roblox",
+    "company":           "a large platform company",
+    "company_normalized": "a large platform company",
     "location":          "Remote (US)",
     "remote":            True,
     "salary_min":        280000,
     "salary_max":        380000,
-    "description":       "Lead platform engineering for Roblox.",
+    "description":       "Lead platform engineering for a large platform company.",
 }
 
 
@@ -203,7 +203,7 @@ _TRUNCATED_OPENAI = (
 )
 
 
-def test_salvage_truncated_json_anduril_fixture:
+def test_salvage_truncated_json_anduril_fixture():
     """Close-the-containers salvage recovers score + earlier fields from
     a response truncated mid-life_fit_concerns string."""
     from scoring.semantic import _parse_response
@@ -221,7 +221,7 @@ def test_salvage_truncated_json_anduril_fixture:
     assert isinstance(out["life_fit_concerns"], list)
 
 
-def test_salvage_truncated_json_openai_fixture:
+def test_salvage_truncated_json_openai_fixture():
     """Second real-world truncation case - short life_fit_concerns 'Progra'."""
     from scoring.semantic import _parse_response
     out = _parse_response(_TRUNCATED_OPENAI)
@@ -233,26 +233,26 @@ def test_salvage_truncated_json_openai_fixture:
     assert isinstance(out["life_fit_concerns"], list)
 
 
-def test_salvage_no_opening_brace_returns_none:
+def test_salvage_no_opening_brace_returns_none():
     """Salvage has nothing to work with if response never started an object."""
     from scoring.semantic import _salvage_truncated_json
     assert _salvage_truncated_json("no braces here") is None
     assert _salvage_truncated_json("") is None
 
 
-def test_salvage_unaffected_when_response_is_clean:
+def test_salvage_unaffected_when_response_is_clean():
     """A well-formed response parses via the fast path, not the salvage path."""
     from scoring.semantic import _parse_response
     clean = (
         '{"score": 75, "work_mode": "remote", "rationale": "ok",'
         ' "role_family_match": "strong", "industry_match": "strong",'
         ' "geography_match": "reachable", "level_match": "at",'
-        ' "watchlist_dream": false, "life_fit_concerns": }'
+        ' "watchlist_dream": false, "life_fit_concerns": []}'
     )
     out = _parse_response(clean)
     assert out is not None
     assert out["score"] == 75
-    assert out["life_fit_concerns"] == 
+    assert out["life_fit_concerns"] == []
 
 
 def test_semantic_returns_none_on_api_exception(monkeypatch):
@@ -260,8 +260,8 @@ def test_semantic_returns_none_on_api_exception(monkeypatch):
     from scoring import semantic
     monkeypatch.setattr(semantic, "_semantic_enabled", lambda: True)
 
-    def _raising_client:
-        c = MagicMock
+    def _raising_client():
+        c = MagicMock()
         c.messages.create.side_effect = RuntimeError("boom")
         return c
 
@@ -272,7 +272,7 @@ def test_semantic_returns_none_on_api_exception(monkeypatch):
     assert out is None
 
 
-def test_user_message_truncates_long_descriptions:
+def test_user_message_truncates_long_descriptions():
     """Job descriptions > 3000 chars get truncated so we stay in budget."""
     from scoring.semantic import _build_user_message, _JD_MAX_CHARS
     huge = {
@@ -287,7 +287,7 @@ def test_user_message_truncates_long_descriptions:
     assert "[…description truncated…]" in msg
 
 
-def test_user_message_includes_salary_when_present:
+def test_user_message_includes_salary_when_present():
     from scoring.semantic import _build_user_message
     msg = _build_user_message(SAMPLE_JOB)
     assert "$280,000" in msg
@@ -295,7 +295,7 @@ def test_user_message_includes_salary_when_present:
     assert "Title: VP, Platform Engineering" in msg
 
 
-def test_user_message_omits_salary_when_missing:
+def test_user_message_omits_salary_when_missing():
     from scoring.semantic import _build_user_message
     job = dict(SAMPLE_JOB)
     job.pop("salary_min")
@@ -320,7 +320,7 @@ def test_request_shape_passed_to_anthropic(monkeypatch):
                 captured.update(kwargs)
                 return _fake_message('{"score": 50, "rationale": "x"}')
 
-    monkeypatch.setattr(semantic, "_get_client", lambda: _SpyClient)
+    monkeypatch.setattr(semantic, "_get_client", lambda: _SpyClient())
 
     out = semantic.semantic_score(SAMPLE_JOB)
     assert out is not None

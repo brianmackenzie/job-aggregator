@@ -21,7 +21,7 @@ rather than the sum of all runs — critical for staying under Lambda's
 
 Token: stored in SSM at /jobs-aggregator/apify_token (set by the operator via
 `aws ssm put-parameter --name /jobs-aggregator/apify_token ...`). Read
-through common.secrets.get_secret which has a 5-minute in-process cache.
+through common.secrets.get_secret() which has a 5-minute in-process cache.
 
 Field mapping (Apify item -> RawJob):
   jobUrl OR url OR applyUrl    -> url           (try several keys; varies by actor version)
@@ -38,7 +38,7 @@ Errors:
   - SSM token unavailable    -> raises (BaseScraper records errored ScrapeRuns row)
   - One search fails to start -> log warn, continue with the others
   - Run never reaches SUCCEEDED before poll_timeout -> log warn, abandon that run
-  - Per-item parse errors    -> caught upstream by BaseScraper.scrape_run
+  - Per-item parse errors    -> caught upstream by BaseScraper.scrape_run()
 """
 from __future__ import annotations
 
@@ -73,7 +73,7 @@ def _parse_salary(s: str | None) -> tuple[Optional[int], Optional[int]]:
     """
     if not s:
         return (None, None)
-    text = s.lower
+    text = s.lower()
     if "/hour" in text or "/hr" in text or "per hour" in text or "hourly" in text:
         return (None, None)
 
@@ -82,16 +82,16 @@ def _parse_salary(s: str | None) -> tuple[Optional[int], Optional[int]]:
     # the blob carries an explicit salary-context token. This stops prose
     # like "managing a $250,000 budget for a team of 40,000 users" from
     # parsing the bare 40,000 as the bottom of a salary band.
-    nums: list[int] = 
-    marked: list[int] = 
+    nums: list[int] = []
+    marked: list[int] = []
     for dollar, raw, suffix in _SALARY_NUM_RE.findall(s):
         try:
             n = float(raw.replace(",", ""))
         except ValueError:
             continue
-        if suffix.lower == "k":
+        if suffix.lower() == "k":
             n *= 1_000
-        elif suffix.lower == "m":
+        elif suffix.lower() == "m":
             n *= 1_000_000
         n = int(n)
         nums.append(n)
@@ -103,14 +103,14 @@ def _parse_salary(s: str | None) -> tuple[Optional[int], Optional[int]]:
         "per year", "per annum", "annual", "base pay", "pay range",
     )
     pool = marked if marked else (
-        nums if any(tok in text for tok in _SALARY_CTX) else 
+        nums if any(tok in text for tok in _SALARY_CTX) else []
     )
     # Drop trivially-small numbers (e.g. "401k plan" → 401000); require
     # >= $20K to count as a candidate salary number.
     pool = [n for n in pool if n >= 20_000]
     if len(pool) < 2:
         return (None, None)
-    pool.sort
+    pool.sort()
     return (pool[0], pool[-1])
 
 
@@ -132,14 +132,14 @@ def _start_run(
     scraper supports TWO input shapes for the bebity actor:
 
       (legacy, URL-based) {"searchUrl": "...", "count": 50, "scrapeCompany": False}
-        — used by broad keyword searches in sources.yaml `searches.url`
+        — used by broad keyword searches in sources.yaml `searches[].url`
 
       (structured, recommended) {"companyName": ["Acme Corp"],
                                  "experienceLevel": ["Director", "Executive"],
                                  "publishedAt": "Past 24 hours",
                                  "rows": 50, ...}
         — used by the per-company pinned searches (sources.yaml
-          `searches.input`). Structured input routes through LinkedIn's
+          `searches[].input`). Structured input routes through LinkedIn's
           native company-resolver instead of keyword boolean matching,
           which collapses the 98% drift we saw on the URL-keyword form.
 
@@ -154,8 +154,8 @@ def _start_run(
             json=payload,
             timeout=30,
         )
-        r.raise_for_status
-        return r.json.get("data") or {}
+        r.raise_for_status()
+        return r.json().get("data") or {}
     except Exception as exc:
         # Caller decides whether to keep going (we just log + return None).
         log.warn(
@@ -175,8 +175,8 @@ def _get_run_status(run_id: str, token: str) -> str:
         params={"token": token},
         timeout=15,
     )
-    r.raise_for_status
-    return (r.json.get("data") or {}).get("status") or "UNKNOWN"
+    r.raise_for_status()
+    return (r.json().get("data") or {}).get("status") or "UNKNOWN"
 
 
 def _fetch_dataset_items(dataset_id: str, token: str) -> list[dict]:
@@ -188,9 +188,9 @@ def _fetch_dataset_items(dataset_id: str, token: str) -> list[dict]:
         params={"token": token, "format": "json", "clean": "true"},
         timeout=60,
     )
-    r.raise_for_status
-    data = r.json
-    return data if isinstance(data, list) else 
+    r.raise_for_status()
+    data = r.json()
+    return data if isinstance(data, list) else []
 
 
 # ---------- The scraper -----------------------------------------------------
@@ -214,7 +214,7 @@ class ApifyLinkedInScraper(BaseScraper):
         count_per_query = int(cfg.get("count_per_search", 50))
         poll_interval   = float(cfg.get("poll_interval_secs", 6))
         poll_timeout    = float(cfg.get("poll_timeout_secs", 240))
-        searches        = cfg.get("searches") or 
+        searches        = cfg.get("searches") or []
 
         # ---- One-shot overrides --------------------------------------------
         # Set by scrape_worker when the lambda is invoked with an `overrides`
@@ -249,7 +249,7 @@ class ApifyLinkedInScraper(BaseScraper):
             # This lets the historical-seed override reach both shapes
             # of searches uniformly.
             new_published_at = _f_tpr_to_published_at(new_tpr)
-            patched = 
+            patched = []
             for s in searches:
                 s2 = dict(s)
                 if s2.get("url"):
@@ -273,15 +273,15 @@ class ApifyLinkedInScraper(BaseScraper):
             return
 
         # Fetch the token once per scrape. Raises if SSM is unreachable —
-        # BaseScraper.scrape_run catches and records the errored run.
+        # BaseScraper.scrape_run() catches and records the errored run.
         token = get_secret(token_param)
 
         # ---- start every run, capture (search, run_id, dataset_id)
         # We do this serially (one POST per search) but it's fast — each POST
         # returns in ~200ms once Apify accepts the run.
-        started: list[dict] = 
+        started: list[dict] = []
         for s in searches:
-            self._throttle
+            self._throttle()
             payload = _build_actor_payload(s, count_per_query)
             if payload is None:
                 log.warn(
@@ -297,7 +297,7 @@ class ApifyLinkedInScraper(BaseScraper):
                 "search_name": s["name"],
                 "run_id":      data["id"],
                 "dataset_id":  data["defaultDatasetId"],
-                "started_at":  time.monotonic,
+                "started_at":  time.monotonic(),
             })
             log.info(
                 "apify_run_started",
@@ -313,21 +313,21 @@ class ApifyLinkedInScraper(BaseScraper):
 
         # ---- poll all runs in parallel until each finishes (or times out)
         pending  = {r["run_id"]: r for r in started}
-        finished: list[dict] = 
+        finished: list[dict] = []
         while pending:
-            for run_id in list(pending.keys):
+            for run_id in list(pending.keys()):
                 run = pending[run_id]
                 # Per-run timeout — give up rather than blocking the Lambda.
-                if time.monotonic - run["started_at"] > poll_timeout:
+                if time.monotonic() - run["started_at"] > poll_timeout:
                     log.warn(
                         "apify_run_timed_out",
                         search=run["search_name"],
                         run_id=run_id,
-                        elapsed=round(time.monotonic - run["started_at"], 1),
+                        elapsed=round(time.monotonic() - run["started_at"], 1),
                     )
                     pending.pop(run_id)
                     continue
-                self._throttle
+                self._throttle()
                 try:
                     status = _get_run_status(run_id, token)
                 except Exception as exc:
@@ -355,7 +355,7 @@ class ApifyLinkedInScraper(BaseScraper):
                 time.sleep(poll_interval)
 
         # ---- pull each successful dataset and yield each item.
-        # We tag each item with `_search_name` so parse can use it as a
+        # We tag each item with `_search_name` so parse() can use it as a
         # disambiguating prefix in the slug-style native_id.
         for run in finished:
             try:
@@ -393,7 +393,7 @@ class ApifyLinkedInScraper(BaseScraper):
                 payload.get("jobUrl") or payload.get("url") or payload.get("applyUrl") or ""
             )
         )
-        title = (payload.get("title") or "").strip
+        title = (payload.get("title") or "").strip()
         if not native_id or not title:
             return None
 
@@ -401,7 +401,7 @@ class ApifyLinkedInScraper(BaseScraper):
             payload.get("companyName")
             or payload.get("company")
             or ""
-        ).strip
+        ).strip()
         # Skip rows with no company. Without it the downstream PutItem
         # fails on the CompanyIndex GSI ("empty string for key attribute"),
         # which surfaces as a per-row error in ScrapeRuns. Apify
@@ -444,13 +444,13 @@ class ApifyLinkedInScraper(BaseScraper):
             payload.get("workplaceType")
             or payload.get("workType")
             or ""
-        ).lower
+        ).lower()
         remote: Optional[bool] = None
         if wt == "remote":
             remote = True
         elif wt in ("on-site", "onsite", "on_site"):
             remote = False
-        elif location and "remote" in location.lower:
+        elif location and "remote" in location.lower():
             remote = True
 
         return RawJob(

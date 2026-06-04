@@ -14,8 +14,8 @@ When to use:
 
 Design:
   - Scans Jobs table in pages (DynamoDB Scan with pagination).
-  - Applies score to each job using empty prefs (personalisation = ).
-  - Writes back only the score-related fields via update_job_score.
+  - Applies score() to each job using empty prefs (personalisation = ).
+  - Writes back only the score-related fields via update_job_score().
   - Wraps each item in try/except so one bad row never aborts the run.
   - Logs a summary at the end for CloudWatch visibility.
 """
@@ -37,13 +37,13 @@ def _to_dynamo(obj):
     """Recursively convert Python floats to Decimal for DynamoDB compatibility.
 
     boto3's DynamoDB resource rejects plain Python floats (raises TypeError).
-    We convert via str to preserve the rounded representation and avoid
+    We convert via str() to preserve the rounded representation and avoid
     the binary-float precision issues that Decimal(float) would introduce.
     """
     if isinstance(obj, float):
         return Decimal(str(obj))
     if isinstance(obj, dict):
-        return {k: _to_dynamo(v) for k, v in obj.items}
+        return {k: _to_dynamo(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [_to_dynamo(i) for i in obj]
     return obj
@@ -53,7 +53,7 @@ def _to_dynamo(obj):
 _dynamodb = boto3.resource("dynamodb")
 
 
-def _get_table:
+def _get_table():
     table_name = os.environ["JOBS_TABLE"]
     return _dynamodb.Table(table_name)
 
@@ -143,8 +143,18 @@ def handler(event, context):
         cutoff = datetime.now(timezone.utc) - timedelta(hours=float(min_age_hours))
         cutoff_iso = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    table = _get_table
-    started = time.monotonic
+    # Targeted re-Haiku: restrict the pass to specific sources and/or to
+    # rows that actually carry a description. Used to refresh ONLY the rows
+    # a description backfill just enriched, instead of paying for a global
+    # force_semantic over the whole table. Both default off (no behavior
+    # change for existing callers / the scheduled rescore).
+    source_filter      = (event or {}).get("source_filter")   # str | list | None
+    require_description = bool((event or {}).get("require_description", False))
+    if isinstance(source_filter, str):
+        source_filter = [source_filter]
+
+    table = _get_table()
+    started = time.monotonic()
 
     total              = 0
     updated            = 0
@@ -190,8 +200,15 @@ def handler(event, context):
         # 'status' and 'location' are reserved words in DynamoDB expressions.
         "ExpressionAttributeNames": {"#s": "status", "#loc": "location"},
     }
+    _filt = None
     if status_filter:
-        scan_kwargs["FilterExpression"] = Attr("status").eq(status_filter)
+        _filt = Attr("status").eq(status_filter)
+    if source_filter:
+        _sf = (Attr("source").is_in(source_filter)
+               if len(source_filter) > 1 else Attr("source").eq(source_filter[0]))
+        _filt = _sf if _filt is None else (_filt & _sf)
+    if _filt is not None:
+        scan_kwargs["FilterExpression"] = _filt
 
     # Parallel-scan: if both segment and total_segments are provided,
     # this Lambda only walks its slice of the table. Useful for getting
@@ -206,7 +223,7 @@ def handler(event, context):
             scan_kwargs["ExclusiveStartKey"] = last_key
 
         response = table.scan(**scan_kwargs)
-        items    = response.get("Items", )
+        items    = response.get("Items", [])
 
         for item in items:
             total += 1
@@ -216,6 +233,11 @@ def handler(event, context):
             # the same logical batch (e.g. after a force_semantic run
             # that timed out partway through).
             if cutoff_iso and (item.get("semantic_scored_at") or "") > cutoff_iso:
+                skipped += 1
+                continue
+            # Targeted re-Haiku: skip rows with no real description (nothing
+            # new for the semantic layer to read).
+            if require_description and len((item.get("description") or "")) < 50:
                 skipped += 1
                 continue
             try:
@@ -332,9 +354,9 @@ def handler(event, context):
                         # prefilter passthroughs.
                         ":pf":  bool(result.get("passed_prefilter") or False),
                         ":pr":  str(result.get("prefilter_reason") or "unknown"),
-                        ":hd":  list(result.get("hard_disqualifiers") or ),
-                        ":sw":  list(result.get("soft_warnings") or ),
-                        ":ps":  list(result.get("positive_signals") or ),
+                        ":hd":  list(result.get("hard_disqualifiers") or []),
+                        ":sw":  list(result.get("soft_warnings") or []),
+                        ":ps":  list(result.get("positive_signals") or []),
                         ":idc": bool(result.get("is_dream_company") or False),
                         ":ihr": bool(result.get("is_hrc100") or False),
                         ":icr": bool(result.get("is_crunch_co") or False),
@@ -379,7 +401,7 @@ def handler(event, context):
                         values[":gm"]  = str(result.get("geography_match")   or "unclear")
                         values[":lm"]  = str(result.get("level_match")       or "unclear")
                         values[":wd"]  = bool(result.get("watchlist_dream") or False)
-                        values[":lfc"] = list(result.get("life_fit_concerns") or )
+                        values[":lfc"] = list(result.get("life_fit_concerns") or [])
 
                     # work_mode: . Persist independently from the
                     # semantic cache so the UI chip stays available even
@@ -403,8 +425,8 @@ def handler(event, context):
                         "qol_score = :qs",
                         "qol_breakdown = :qb",
                     ]
-                    values[":ind"] = result.get("industries") or 
-                    values[":rt"]  = result.get("role_types") or 
+                    values[":ind"] = result.get("industries") or []
+                    values[":rt"]  = result.get("role_types") or []
                     values[":qs"]  = int(result.get("qol_score") or 0)
                     values[":qb"]  = _to_dynamo(result.get("qol_breakdown") or {})
                     if result.get("company_group"):
@@ -412,7 +434,7 @@ def handler(event, context):
                         values[":cg"] = result["company_group"]
 
                     # engagement_type — categorical chip,
-                    # populated by detect_engagement in combined.py. Always
+                    # populated by detect_engagement() in combined.py. Always
                     # write (deterministic; cheap) so the filter chip rail
                     # has data to render. Falls back to "unclear" for empty
                     # titles, which still parses safely client-side.
@@ -441,7 +463,7 @@ def handler(event, context):
         if not last_key:
             break   # No more pages.
 
-    duration_ms = int((time.monotonic - started) * 1000)
+    duration_ms = int((time.monotonic() - started) * 1000)
 
     # clear the in-process browse-scan cache. NOTE: this only
     # clears THIS Lambda container's cache. RescoreFn ≠ ApiJobsFn so the
@@ -452,7 +474,7 @@ def handler(event, context):
     if not dry_run:
         try:
             from common import db as _db
-            _db.invalidate_browse_cache
+            _db.invalidate_browse_cache()
         except Exception as _exc:
             log.warn("rescore_cache_invalidate_failed", error=str(_exc))
 

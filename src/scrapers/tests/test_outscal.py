@@ -1,6 +1,6 @@
-"""Tests for src/scrapers/outscal.py — parse against fixture HTML.
+"""Tests for src/scrapers/outscal.py — parse() against fixture HTML.
 
-No HTTP. fetch is exercised by the live smoke test.
+No HTTP. fetch() is exercised by the live smoke test.
 """
 from scrapers.outscal import OutscalScraper
 
@@ -54,9 +54,9 @@ def _payload(html: str = _CARD_HTML,
     }
 
 
-def test_parse_canonical_card:
-    s   = OutscalScraper
-    raw = s.parse(_payload)
+def test_parse_canonical_card():
+    s   = OutscalScraper()
+    raw = s.parse(_payload())
     assert raw is not None
     assert raw.title    == "Engineering Manager, Navigation SDK"
     assert raw.company  == "Mapbox"
@@ -70,8 +70,8 @@ def test_parse_canonical_card:
                        "in-minsk-belarus")
 
 
-def test_parse_remote_inferred_from_location_suffix:
-    s   = OutscalScraper
+def test_parse_remote_inferred_from_location_suffix():
+    s   = OutscalScraper()
     raw = s.parse(_payload(html=_CARD_HTML_REMOTE,
                             href="/job/staff-engineer-at-acme-remote"))
     assert raw is not None
@@ -81,7 +81,7 @@ def test_parse_remote_inferred_from_location_suffix:
     assert raw.remote is True
 
 
-def test_parse_does_not_use_img_alt_as_company:
+def test_parse_does_not_use_img_alt_as_company():
     """REGRESSION: Outscal's <img alt> is the job title, NOT the company.
     If we ever swap to alt-text fallback for company, this test catches it."""
     no_company_p = """
@@ -91,22 +91,22 @@ def test_parse_does_not_use_img_alt_as_company:
       <p class="text-sm">Some location</p>
     </a>
     """
-    s = OutscalScraper
+    s = OutscalScraper()
     # No <p class="font-medium"> for company → must skip rather than
     # accidentally use the img alt (which is "Lead Designer").
     assert s.parse(_payload(html=no_company_p, href="/job/x")) is None
 
 
-def test_parse_skips_when_no_title:
+def test_parse_skips_when_no_title():
     no_title = """
     <a class="block" href="/job/x">
       <p class="font-medium">Some Co</p>
     </a>
     """
-    s = OutscalScraper
+    s = OutscalScraper()
     assert s.parse(_payload(html=no_title, href="/job/x")) is None
 
 
-def test_parse_skips_when_href_blank:
-    s = OutscalScraper
+def test_parse_skips_when_href_blank():
+    s = OutscalScraper()
     assert s.parse({"_href": "", "_url": "", "_html": _CARD_HTML}) is None

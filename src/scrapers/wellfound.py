@@ -38,7 +38,7 @@ _JOB_HREF_RE = re.compile(r"/(?:company/[^/]+/)?jobs/(\d+)(?:-([^/?]+))?")
 def _clean(s: str) -> str:
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 @register("wellfound")
@@ -63,9 +63,9 @@ class WellfoundScraper(BaseScraper):
         cfg = load_source_config(self.source_name)
         search_urls = cfg.get("search_urls") or self.DEFAULT_SEARCH_URLS
 
-        seen_hrefs: set[str] = set
+        seen_hrefs: set[str] = set()
         for search_url in search_urls:
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     search_url,
@@ -75,7 +75,7 @@ class WellfoundScraper(BaseScraper):
                     },
                     timeout=30,
                 )
-                resp.raise_for_status
+                resp.raise_for_status()
             except requests.RequestException:
                 # Wellfound 403s a lot — log via the per-item path and continue.
                 continue
@@ -117,7 +117,7 @@ class WellfoundScraper(BaseScraper):
         company = ""
         co_match = re.search(r"/company/([^/]+)/", href)
         if co_match:
-            company = co_match.group(1).replace("-", " ").title
+            company = co_match.group(1).replace("-", " ").title()
 
         if not company:
             for tag in soup.find_all(["span", "p", "div"]):
@@ -126,7 +126,7 @@ class WellfoundScraper(BaseScraper):
                 text = _clean(tag.get_text(" ", strip=True))
                 if not text or text == title or len(text) > 80:
                     continue
-                if "remote" in text.lower or re.search(r",\s*[A-Z]{2}\b", text):
+                if "remote" in text.lower() or re.search(r",\s*[A-Z]{2}\b", text):
                     continue
                 company = text
                 break
@@ -139,7 +139,7 @@ class WellfoundScraper(BaseScraper):
             text = _clean(tag.get_text(" ", strip=True))
             if not text or text == title or text == company or len(text) > 80:
                 continue
-            if "remote" in text.lower or re.search(r",\s*[A-Z]{2}\b", text):
+            if "remote" in text.lower() or re.search(r",\s*[A-Z]{2}\b", text):
                 location = text
                 break
 
@@ -147,7 +147,7 @@ class WellfoundScraper(BaseScraper):
             return None
 
         remote = None
-        if location and "remote" in location.lower:
+        if location and "remote" in location.lower():
             remote = True
 
         return RawJob(

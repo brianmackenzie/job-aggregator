@@ -1,9 +1,9 @@
-"""Tests for src/scrapers/remoteok.py. Unit-tests parse only — no HTTP."""
+"""Tests for src/scrapers/remoteok.py. Unit-tests parse() only — no HTTP."""
 from scrapers.remoteok import RemoteOKScraper
 
 
-def test_parse_full_payload:
-    s = RemoteOKScraper
+def test_parse_full_payload():
+    s = RemoteOKScraper()
     raw = s.parse({
         "id": "123456",
         "position": "Senior Engineer",
@@ -27,19 +27,19 @@ def test_parse_full_payload:
     assert raw.posted_at == "1776340800"
 
 
-def test_parse_missing_title_skips:
-    s = RemoteOKScraper
+def test_parse_missing_title_skips():
+    s = RemoteOKScraper()
     assert s.parse({"id": "1", "company": "Acme"}) is None
 
 
-def test_parse_missing_company_skips:
-    s = RemoteOKScraper
+def test_parse_missing_company_skips():
+    s = RemoteOKScraper()
     assert s.parse({"id": "1", "position": "Engineer"}) is None
 
 
-def test_parse_fallback_date_field:
+def test_parse_fallback_date_field():
     """When `epoch` is missing, fall back to `date`."""
-    s = RemoteOKScraper
+    s = RemoteOKScraper()
     raw = s.parse({
         "id": "1",
         "position": "Eng",

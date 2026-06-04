@@ -1,6 +1,6 @@
-"""Tests for src/scrapers/asgc_sheet.py — parse + header alias logic.
+"""Tests for src/scrapers/asgc_sheet.py — parse() + header alias logic.
 
-No HTTP. fetch is exercised by the live smoke test once the maintainer's
+No HTTP. fetch() is exercised by the live smoke test once the maintainer's
 csv_url is wired into config/sources.yaml.
 """
 from scrapers.asgc_sheet import ASGCSheetScraper, _pick
@@ -8,34 +8,34 @@ from scrapers.asgc_sheet import ASGCSheetScraper, _pick
 
 # ---------- _pick (header aliasing) ----------------------------------------
 
-def test_pick_first_match_wins:
+def test_pick_first_match_wins():
     row = {"Company": "Acme", "Employer": "ShouldBeIgnored"}
     assert _pick(row, ("company", "employer")) == "Acme"
 
 
-def test_pick_falls_back_to_alias:
+def test_pick_falls_back_to_alias():
     """When the maintainer used 'Employer' instead of 'Company'."""
     row = {"Employer": "Acme"}
     assert _pick(row, ("company", "employer")) == "Acme"
 
 
-def test_pick_case_and_whitespace_insensitive:
+def test_pick_case_and_whitespace_insensitive():
     row = {"  COMPANY  ": "Acme"}
     assert _pick(row, ("company",)) == "Acme"
 
 
-def test_pick_skips_empty_values:
+def test_pick_skips_empty_values():
     """Empty cells should not be treated as matches."""
     row = {"Company": "", "Employer": "Acme"}
     assert _pick(row, ("company", "employer")) == "Acme"
 
 
-def test_pick_returns_empty_when_no_match:
+def test_pick_returns_empty_when_no_match():
     row = {"Foo": "Bar"}
     assert _pick(row, ("company", "employer")) == ""
 
 
-# ---------- parse --------------------------------------------------------
+# ---------- parse() --------------------------------------------------------
 
 def _row(**over):
     base = {
@@ -51,9 +51,9 @@ def _row(**over):
     return base
 
 
-def test_parse_canonical_row:
-    s   = ASGCSheetScraper
-    raw = s.parse(_row)
+def test_parse_canonical_row():
+    s   = ASGCSheetScraper()
+    raw = s.parse(_row())
     assert raw is not None
     # native_id is the URL slug.
     assert raw.native_id  == "12345"
@@ -67,9 +67,9 @@ def test_parse_canonical_row:
     assert raw.remote is None
 
 
-def test_parse_alternate_header_spellings:
+def test_parse_alternate_header_spellings():
     """Maintainers freely rename columns. We accept the alias set."""
-    s   = ASGCSheetScraper
+    s   = ASGCSheetScraper()
     raw = s.parse({
         "Employer":     "Example Studio",
         "Title":        "Director, Game Engineering",
@@ -88,20 +88,20 @@ def test_parse_alternate_header_spellings:
     assert raw.description == "Lead the engine team."
 
 
-def test_parse_skips_rows_missing_company:
-    s = ASGCSheetScraper
+def test_parse_skips_rows_missing_company():
+    s = ASGCSheetScraper()
     assert s.parse(_row(Company="")) is None
 
 
-def test_parse_skips_rows_missing_role:
-    s = ASGCSheetScraper
+def test_parse_skips_rows_missing_role():
+    s = ASGCSheetScraper()
     assert s.parse(_row(Role="")) is None
 
 
-def test_parse_uses_row_index_when_url_missing:
+def test_parse_uses_row_index_when_url_missing():
     """No URL column / blank URL → fall back to a stable row-index id so
     we don't drop the row entirely."""
-    s   = ASGCSheetScraper
+    s   = ASGCSheetScraper()
     raw = s.parse(_row(URL=""))
     assert raw is not None
     assert raw.native_id == "row-7"
@@ -109,14 +109,14 @@ def test_parse_uses_row_index_when_url_missing:
     assert raw.url == ""
 
 
-def test_parse_url_with_trailing_slash:
+def test_parse_url_with_trailing_slash():
     """URL slug extraction shouldn't be confused by a trailing slash."""
-    s   = ASGCSheetScraper
+    s   = ASGCSheetScraper()
     raw = s.parse(_row(URL="https://example.com/jobs/abc-123/"))
     assert raw.native_id == "abc-123"
 
 
-def test_parse_skip_when_unrecognized_schema:
+def test_parse_skip_when_unrecognized_schema():
     """Sheet with completely unrelated columns → skip."""
-    s = ASGCSheetScraper
+    s = ASGCSheetScraper()
     assert s.parse({"Foo": "Bar", "Baz": "Quux"}) is None

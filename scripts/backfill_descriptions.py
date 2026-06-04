@@ -89,7 +89,7 @@ def _make_describe(source):
         return _wd
 
     # Board sources: the stored url IS the detail page.
-    sc = get_scraper(source)
+    sc = get_scraper(source)()
     if hasattr(sc, "_fetch_description"):          # game_jobs_uk (own headers)
         return lambda row: sc._fetch_description(row.get("url")) if row.get("url") else None
     sel = getattr(sc, "_DESC_SELECTOR", None)      # generic auto-fetch boards
@@ -111,7 +111,7 @@ def backfill_source(t, source, limit, rps, dry):
         if ek:
             kw["ExclusiveStartKey"] = ek
         resp = t.scan(**kw)
-        for row in resp.get("Items", ):
+        for row in resp.get("Items", []):
             scanned += 1
             if len(row.get("description") or "") >= _EMPTY_THRESHOLD:
                 continue
@@ -143,15 +143,15 @@ def backfill_source(t, source, limit, rps, dry):
     return scanned, updated, failed
 
 
-def main -> int:
-    ap = argparse.ArgumentParser
+def main() -> int:
+    ap = argparse.ArgumentParser()
     ap.add_argument("--source", required=True,
                     help="workday | a board name | all-boards")
     ap.add_argument("--limit", type=int, default=0, help="max UPDATES per source (0=all)")
     ap.add_argument("--rps", type=float, default=1.0)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--table", default=os.environ.get("JOBS_TABLE"))
-    args = ap.parse_args
+    args = ap.parse_args()
     if not args.table:
         print("Set JOBS_TABLE env or pass --table.", file=sys.stderr)
         return 2
@@ -177,4 +177,4 @@ def main -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main)
+    raise SystemExit(main())

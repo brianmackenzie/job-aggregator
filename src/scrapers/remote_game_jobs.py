@@ -51,7 +51,7 @@ _WHITESPACE_RE = re.compile(r"\s+")
 def _clean(s: str) -> str:
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 @register("remote_game_jobs")
@@ -60,7 +60,7 @@ class RemoteGameJobsScraper(BaseScraper):
     schedule = "cron(30 6 * * ? *)"      # 06:30 UTC daily
     rate_limit_rps = 1.0
     # 2026-06-03: detail-page descriptions (the listing/card omits the JD).
-    # scrape_run fetches RawJob.url + extracts JSON-LD first, then this
+    # scrape_run() fetches RawJob.url + extracts JSON-LD first, then this
     # CSS selector; populates QoL keyword scoring + the semantic pass.
     auto_fetch_description = True
     _DESC_SELECTOR = 'div.content'
@@ -73,7 +73,7 @@ class RemoteGameJobsScraper(BaseScraper):
 
     def fetch(self) -> Iterable[dict]:
         # Single GET — homepage is the listing, all jobs server-rendered.
-        self._throttle
+        self._throttle()
         resp = requests.get(
             self.LIST_URL,
             headers={
@@ -82,14 +82,14 @@ class RemoteGameJobsScraper(BaseScraper):
             },
             timeout=30,
         )
-        resp.raise_for_status
+        resp.raise_for_status()
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
         # Each card is <div class="job-box"> with a single <a> wrapping
         # an <article class="media">. We yield the .job-box outerHTML so
-        # parse has the full card available (logo + title + company + tags).
-        seen_hrefs: set[str] = set
+        # parse() has the full card available (logo + title + company + tags).
+        seen_hrefs: set[str] = set()
         for box in soup.find_all("div", class_=re.compile(r"\bjob-box\b")):
             anchor = box.find("a", href=True)
             if anchor is None:

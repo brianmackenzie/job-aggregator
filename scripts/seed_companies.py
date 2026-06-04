@@ -13,7 +13,7 @@ Prerequisites:
     - pyyaml installed: pip install pyyaml
 
 What this writes to DynamoDB:
-    PK:  company_name_normalized  (e.g. "riot games")
+    PK:  company_name_normalized  (e.g. "a game studio")
     SK:  (none — simple PK table)
     GSI: TierIndex on `tier` field (e.g. "S", "1", "2")
     Fields: name, tier, ats, ats_slug, industry, hq, notes
@@ -28,7 +28,7 @@ import yaml
 # ---------------------------------------------------------------------------
 # Resolve paths — script can be run from any directory.
 # ---------------------------------------------------------------------------
-REPO_ROOT    = Path(__file__).resolve.parent.parent
+REPO_ROOT    = Path(__file__).resolve().parent.parent
 COMPANIES_YML = REPO_ROOT / "config" / "companies.yaml"
 STACK_NAME   = "jobs-aggregator"
 
@@ -44,7 +44,7 @@ def get_table_name(cf_client) -> str:
         return env_name
 
     resp = cf_client.describe_stacks(StackName=STACK_NAME)
-    outputs = resp["Stacks"][0].get("Outputs", )
+    outputs = resp["Stacks"][0].get("Outputs", [])
     for out in outputs:
         if out["OutputKey"] == "CompaniesTableName":
             return out["OutputValue"]
@@ -54,13 +54,13 @@ def get_table_name(cf_client) -> str:
     )
 
 
-def load_companies -> list[dict]:
+def load_companies() -> list[dict]:
     """Parse config/companies.yaml and return the companies list."""
-    if not COMPANIES_YML.exists:
+    if not COMPANIES_YML.exists():
         raise FileNotFoundError(f"Not found: {COMPANIES_YML}")
     with open(COMPANIES_YML, encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
-    companies = data.get("companies", )
+    companies = data.get("companies", [])
     if not companies:
         raise ValueError("companies.yaml has an empty companies list")
     return companies
@@ -74,7 +74,7 @@ def build_row(company: dict) -> dict:
     keep rows clean (DynamoDB doesn't like empty strings).
     """
     row: dict = {}
-    name_norm = company.get("name_normalized", "").strip.lower
+    name_norm = company.get("name_normalized", "").strip().lower()
     if not name_norm:
         raise ValueError(f"Missing name_normalized in entry: {company}")
 
@@ -93,9 +93,9 @@ def build_row(company: dict) -> dict:
 # Main
 # ---------------------------------------------------------------------------
 
-def main:
+def main():
     print(f"Loading companies from {COMPANIES_YML} ...")
-    companies = load_companies
+    companies = load_companies()
     print(f"  Found {len(companies)} companies.")
 
     # Resolve the live DynamoDB table name from CloudFormation.
@@ -111,7 +111,7 @@ def main:
     # which caused upserts to be miscounted as failures when the print line
     # crashed after a successful put_item.
     ok = 0
-    failed = 
+    failed = []
     for company in companies:
         row = None
         try:
@@ -132,4 +132,4 @@ def main:
 
 
 if __name__ == "__main__":
-    main
+    main()

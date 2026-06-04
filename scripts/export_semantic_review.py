@@ -133,21 +133,21 @@ def _to_bool(v: Any) -> bool:
         return v
     if isinstance(v, (int, float, Decimal)):
         return int(v) != 0
-    s = str(v).strip.lower
+    s = str(v).strip().lower()
     return s in ("true", "t", "yes", "y", "1")
 
 
 def _as_list(v: Any) -> list[str]:
     """Normalise DDB L/S values (or None) to a list of strings."""
     if v is None:
-        return 
+        return []
     if isinstance(v, list):
-        return [str(x) for x in v if x is not None and str(x).strip]
+        return [str(x) for x in v if x is not None and str(x).strip()]
     if isinstance(v, (set, tuple)):
-        return [str(x) for x in v if x is not None and str(x).strip]
+        return [str(x) for x in v if x is not None and str(x).strip()]
     # Single value — wrap.
-    s = str(v).strip
-    return [s] if s else 
+    s = str(v).strip()
+    return [s] if s else []
 
 
 def _fmt_salary(lo: Any, hi: Any, cur: Any) -> str:
@@ -158,7 +158,7 @@ def _fmt_salary(lo: Any, hi: Any, cur: Any) -> str:
     """
     lo_i = _to_int(lo)
     hi_i = _to_int(hi)
-    cur_s = (str(cur).strip or "USD") if cur else "USD"
+    cur_s = (str(cur).strip() or "USD") if cur else "USD"
     if not lo_i and not hi_i:
         return ""
     def pretty(n: int) -> str:
@@ -203,7 +203,7 @@ def _md_escape_inline(s: str) -> str:
         .replace("\r", " ")
         .replace("\n", " ")
         .replace("|", "/")           # would split a table column
-        .strip
+        .strip()
     )
 
 
@@ -215,18 +215,18 @@ def _md_block_rationale(text: str) -> str:
     """
     if not text:
         return "_(no rationale)_"
-    t = str(text).strip
+    t = str(text).strip()
     # Collapse tabs + extra spaces but preserve paragraph breaks.
-    lines = [ln.strip for ln in t.splitlines if ln.strip]
+    lines = [ln.strip() for ln in t.splitlines() if ln.strip()]
     return "\n".join(f"> {ln}" for ln in lines)
 
 
 def _anchor(label: str) -> str:
     """GitHub-style slug for an in-doc anchor link."""
-    anchor = label.lower
-    for bad in "./·—":
+    anchor = label.lower()
+    for bad in ".()/·—":
         anchor = anchor.replace(bad, "")
-    return "-".join(anchor.split)
+    return "-".join(anchor.split())
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ def assign_view(row: dict) -> str:
     because the whole point of the flag is that the auto verdict isn't
     trustworthy and the original author wants to eyeball it.
     """
-    tier = str(row.get("tier") or "").strip.lower
+    tier = str(row.get("tier") or "").strip().lower()
     if tier == "needs_review":
         return VIEW_REVIEW
     # tier "DISQUALIFIED" is the new prefilter-fail label
@@ -320,7 +320,7 @@ def scan_jobs(
 
     filter_expr = Attr("status").eq(status)
 
-    rows: list[dict] = 
+    rows: list[dict] = []
     last_key: dict | None = None
     scanned = 0
     while True:
@@ -332,7 +332,7 @@ def scan_jobs(
         if last_key is not None:
             kwargs["ExclusiveStartKey"] = last_key
         resp = tbl.scan(**kwargs)
-        page = resp.get("Items") or 
+        page = resp.get("Items") or []
         scanned += resp.get("ScannedCount", 0)
         for it in page:
             ss = _to_int(it.get("semantic_score"))
@@ -389,7 +389,7 @@ def group_into_views(rows: list[dict]) -> dict[str, dict[str, list[dict]]]:
             views[VIEW_APPLY][sub].append(r)
 
         elif v == VIEW_REVIEW:
-            tier = str(r.get("tier") or "").strip.lower
+            tier = str(r.get("tier") or "").strip().lower()
             if tier == "needs_review":
                 sub = "Needs review (Haiku unavailable / errored)"
             elif _to_bool(r.get("watchlist_dream")):
@@ -417,40 +417,40 @@ def group_into_views(rows: list[dict]) -> dict[str, dict[str, list[dict]]]:
             # "unknown_prefilter_fail" rather than the prior
             # "unspecified" so the original author can search the export for that
             # exact tag.
-            raw_reason = str(r.get("prefilter_reason") or "").strip
+            raw_reason = str(r.get("prefilter_reason") or "").strip()
             if not raw_reason:
                 top_level = "unknown_prefilter_fail"
             elif ":" in raw_reason:
-                top_level = raw_reason.split(":", 1)[0].strip or "unknown_prefilter_fail"
+                top_level = raw_reason.split(":", 1)[0].strip() or "unknown_prefilter_fail"
             else:
                 top_level = raw_reason
             views[VIEW_REJECTS][top_level].append(r)
 
     # Sort each sub-group.
-    for sub_map in views[VIEW_APPLY].values:
+    for sub_map in views[VIEW_APPLY].values():
         sub_map.sort(
             key=lambda r: (
                 -(_to_int(r.get("semantic_score")) or -1),
-                str(r.get("company") or "").lower,
+                str(r.get("company") or "").lower(),
             )
         )
-    for sub_map in views[VIEW_REVIEW].values:
+    for sub_map in views[VIEW_REVIEW].values():
         sub_map.sort(
             key=lambda r: (
                 -(_to_int(r.get("semantic_score")) or -1),
-                str(r.get("company") or "").lower,
+                str(r.get("company") or "").lower(),
             )
         )
-    for sub_map in views[VIEW_REJECTS].values:
+    for sub_map in views[VIEW_REJECTS].values():
         sub_map.sort(
             key=lambda r: (
-                str(r.get("company") or "").lower,
-                str(r.get("title") or "").lower,
+                str(r.get("company") or "").lower(),
+                str(r.get("title") or "").lower(),
             )
         )
 
     # Materialise defaultdicts into plain dicts for predictable iteration.
-    return {k: dict(v) for k, v in views.items}
+    return {k: dict(v) for k, v in views.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -464,13 +464,13 @@ def render_markdown(
     views_to_emit: list[str],
 ) -> str:
     """Build the full markdown string for the export document."""
-    lines: list[str] = 
+    lines: list[str] = []
 
     # ---- Header + preamble ------------------------------------------------
     lines.append("# Semantic-score audit export")
     lines.append("")
     lines.append(
-        f"_Generated {generated_at.isoformat} · status=`{status}` · "
+        f"_Generated {generated_at.isoformat()} · status=`{status}` · "
         f"{total} rows_"
     )
     lines.append("")
@@ -510,7 +510,7 @@ def render_markdown(
             continue
         # Sort sub-groups by count desc for readability.
         sorted_subs = sorted(
-            sub_map.items, key=lambda kv: (-len(kv[1]), kv[0])
+            sub_map.items(), key=lambda kv: (-len(kv[1]), kv[0])
         )
         for sub, bucket in sorted_subs:
             lines.append(f"| {view} | {sub} | {len(bucket)} |")
@@ -518,7 +518,7 @@ def render_markdown(
 
     # Per-view totals (quick eyeball).
     per_view_totals = {
-        view: sum(len(b) for b in grouped.get(view, {}).values)
+        view: sum(len(b) for b in grouped.get(view, {}).values())
         for view in VIEW_ORDER
     }
     totals_line = "  ·  ".join(
@@ -540,7 +540,7 @@ def render_markdown(
         lines.append(f"- [{view}](#{_anchor(view)}) — {n}")
         sub_map = grouped.get(view, {})
         sorted_subs = sorted(
-            sub_map.items, key=lambda kv: (-len(kv[1]), kv[0])
+            sub_map.items(), key=lambda kv: (-len(kv[1]), kv[0])
         )
         for sub, bucket in sorted_subs:
             sub_anchor = _anchor(f"{view} {sub}")
@@ -552,7 +552,7 @@ def render_markdown(
         if view not in views_to_emit:
             continue
         sub_map = grouped.get(view, {})
-        total_in_view = sum(len(b) for b in sub_map.values)
+        total_in_view = sum(len(b) for b in sub_map.values())
         lines.append(f"## {view}")
         lines.append("")
         lines.append(_view_preamble(view, total_in_view))
@@ -566,7 +566,7 @@ def render_markdown(
         # Sub-groups in count-desc order (so the most populous band /
         # reject reason shows up first).
         sorted_subs = sorted(
-            sub_map.items, key=lambda kv: (-len(kv[1]), kv[0])
+            sub_map.items(), key=lambda kv: (-len(kv[1]), kv[0])
         )
         for sub, bucket in sorted_subs:
             # Heading uses view + sub so the anchor is globally unique
@@ -616,7 +616,7 @@ def _render_one_entry(r: dict, view: str) -> list[str]:
     title    = _md_escape_inline(r.get("title") or "(untitled)")
     company  = _md_escape_inline(r.get("company") or "")
     location = _md_escape_inline(r.get("location") or "")
-    url      = str(r.get("url") or "").strip
+    url      = str(r.get("url") or "").strip()
     source   = _md_escape_inline(r.get("source") or "")
     posted   = _short_posted(r.get("posted_at"))
     salary   = _fmt_salary(r.get("salary_min"), r.get("salary_max"),
@@ -624,12 +624,12 @@ def _render_one_entry(r: dict, view: str) -> list[str]:
 
     sem      = _to_int(r.get("semantic_score"))
     final    = _to_int(r.get("score"))
-    tier     = str(r.get("tier") or "").strip
-    track    = str(r.get("track") or "").strip
+    tier     = str(r.get("tier") or "").strip()
+    track    = str(r.get("track") or "").strip()
 
     passed = _to_bool(r.get("passed_prefilter")) if "passed_prefilter" in r \
         else ((_to_int(r.get("algo_score")) or 0) >= 100)
-    reason = str(r.get("prefilter_reason") or "").strip
+    reason = str(r.get("prefilter_reason") or "").strip()
 
     # Build heading with title + company
     head_bits = [f"### {title}"]
@@ -638,16 +638,16 @@ def _render_one_entry(r: dict, view: str) -> list[str]:
     lines = [" ".join(head_bits)]
 
     # Meta row (compact)
-    meta_bits: list[str] = 
+    meta_bits: list[str] = []
     if location:
         meta_bits.append(f"location: {location}")
     if salary:
         meta_bits.append(f"salary: {salary}")
     wm = r.get("work_mode")
-    if wm and str(wm).strip.lower != "unclear":
+    if wm and str(wm).strip().lower() != "unclear":
         meta_bits.append(f"work_mode: {wm}")
     et = r.get("engagement_type")
-    if et and str(et).strip.lower != "unclear":
+    if et and str(et).strip().lower() != "unclear":
         meta_bits.append(f"engagement: {et}")
     if source:
         meta_bits.append(f"src: `{source}`")
@@ -689,7 +689,7 @@ def _render_one_entry(r: dict, view: str) -> list[str]:
     lines.append("**Scores:** " + " · ".join(score_bits))
 
     # Structured semantic fields.
-    struct_bits: list[str] = 
+    struct_bits: list[str] = []
     for k, pretty in (
         ("role_family_match", "role_family"),
         ("industry_match",    "industry"),
@@ -697,7 +697,7 @@ def _render_one_entry(r: dict, view: str) -> list[str]:
         ("level_match",       "level"),
     ):
         val = r.get(k)
-        if val is not None and str(val).strip and str(val).strip.lower != "unclear":
+        if val is not None and str(val).strip() and str(val).strip().lower() != "unclear":
             struct_bits.append(f"{pretty}=`{val}`")
     wd = _to_bool(r.get("watchlist_dream"))
     if wd:
@@ -725,7 +725,7 @@ def _render_one_entry(r: dict, view: str) -> list[str]:
     # The rationale is the MAIN attraction of the document — full text,
     # as a blockquote for easy eye-scanning. For View 3 (rejects) we
     # typically have no rationale, so skip.
-    rationale = str(r.get("semantic_rationale") or "").strip
+    rationale = str(r.get("semantic_rationale") or "").strip()
     if rationale:
         lines.append("")
         lines.append("**Haiku rationale:**")
@@ -768,14 +768,14 @@ def _csv_sub_group(row: dict, view: str) -> str:
     if view == VIEW_APPLY:
         return _apply_band_for(_to_int(row.get("semantic_score")))
     if view == VIEW_REVIEW:
-        tier = str(row.get("tier") or "").strip.lower
+        tier = str(row.get("tier") or "").strip().lower()
         if tier == "needs_review":
             return "Needs review (Haiku unavailable / errored)"
         if _to_bool(row.get("watchlist_dream")):
             return "Watchlist - dream co rescue (low Haiku score)"
         return "Other"
     # VIEW_REJECTS
-    return str(row.get("prefilter_reason") or "unspecified").strip or "unspecified"
+    return str(row.get("prefilter_reason") or "unspecified").strip() or "unspecified"
 
 
 def write_csv(rows: Iterable[dict], path: Path) -> int:
@@ -857,10 +857,10 @@ def _parse_views_arg(raw: str) -> list[str]:
     labels. Unknown tokens raise ValueError (argparse will surface it).
     """
     lookup = {"1": VIEW_APPLY, "2": VIEW_REVIEW, "3": VIEW_REJECTS}
-    tokens = [t.strip for t in (raw or "").split(",") if t.strip]
+    tokens = [t.strip() for t in (raw or "").split(",") if t.strip()]
     if not tokens:
         return list(VIEW_ORDER)
-    out: list[str] = 
+    out: list[str] = []
     for tok in tokens:
         if tok not in lookup:
             raise ValueError(f"unknown view token {tok!r} (expected 1/2/3)")
@@ -920,9 +920,9 @@ def main(argv: list[str] | None = None) -> int:
     # of the export at a glance.
     for view in VIEW_ORDER:
         sub_map = grouped.get(view, {})
-        n_view = sum(len(b) for b in sub_map.values)
+        n_view = sum(len(b) for b in sub_map.values())
         sys.stderr.write(f"  {view}: {n_view} rows\n")
-        for sub, bucket in sorted(sub_map.items,
+        for sub, bucket in sorted(sub_map.items(),
                                    key=lambda kv: (-len(kv[1]), kv[0])):
             sys.stderr.write(f"    - {sub}: {len(bucket)}\n")
 
@@ -937,7 +937,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     md_path.write_text(md, encoding="utf-8")
     sys.stderr.write(
-        f"Wrote markdown: {md_path} ({md_path.stat.st_size:,} bytes)\n"
+        f"Wrote markdown: {md_path} ({md_path.stat().st_size:,} bytes)\n"
     )
 
     csv_path = Path(args.csv)
@@ -945,11 +945,11 @@ def main(argv: list[str] | None = None) -> int:
     n = write_csv(rows, csv_path)
     sys.stderr.write(
         f"Wrote CSV: {csv_path} ({n} rows, "
-        f"{csv_path.stat.st_size:,} bytes)\n"
+        f"{csv_path.stat().st_size:,} bytes)\n"
     )
 
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main)
+    sys.exit(main())

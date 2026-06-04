@@ -25,7 +25,7 @@ _cache: dict[str, tuple[float, str]] = {}
 _client = None
 
 
-def _get_client:
+def _get_client():
     global _client
     if _client is None:
         _client = boto3.client("ssm")
@@ -34,20 +34,20 @@ def _get_client:
 
 def get_secret(name: str) -> str:
     """Fetch /jobs-aggregator/<name>, decrypted. Caches for 5 minutes."""
-    now = time.time
+    now = time.time()
     cached = _cache.get(name)
     if cached and cached[0] > now:
         return cached[1]
 
     full_name = f"{_PREFIX}/{name}"
-    resp = _get_client.get_parameter(Name=full_name, WithDecryption=True)
+    resp = _get_client().get_parameter(Name=full_name, WithDecryption=True)
     value = resp["Parameter"]["Value"]
     _cache[name] = (now + _TTL_SECONDS, value)
     return value
 
 
-def clear_cache -> None:
+def clear_cache() -> None:
     """Test helper — drops the in-process cache."""
-    _cache.clear
+    _cache.clear()
     global _client
     _client = None

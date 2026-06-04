@@ -37,7 +37,7 @@ _JOB_URL_RE = re.compile(r"/(?:en/)?companies/([^/]+)/jobs/([^/?]+)")
 def _clean(s: str) -> str:
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 @register("welcometothejungle")
@@ -57,10 +57,10 @@ class WelcomeToTheJungleScraper(BaseScraper):
         cfg = load_source_config(self.source_name)
         max_pages = int(cfg.get("max_pages") or self.DEFAULT_MAX_PAGES)
 
-        seen_hrefs: set[str] = set
+        seen_hrefs: set[str] = set()
         for page in range(1, max_pages + 1):
             url = self.LIST_URL if page == 1 else f"{self.LIST_URL}?page={page}"
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     url,
@@ -70,7 +70,7 @@ class WelcomeToTheJungleScraper(BaseScraper):
                     },
                     timeout=30,
                 )
-                resp.raise_for_status
+                resp.raise_for_status()
             except requests.RequestException:
                 break
 
@@ -125,14 +125,14 @@ class WelcomeToTheJungleScraper(BaseScraper):
             if not text or text == title or len(text) > 80:
                 continue
             # Skip location-shaped strings.
-            if "remote" in text.lower or re.search(r",\s*[A-Z]{2}\b", text):
+            if "remote" in text.lower() or re.search(r",\s*[A-Z]{2}\b", text):
                 continue
             company = text
             break
 
         # Fall back to URL slug if no DOM hint found.
         if not company and company_slug:
-            company = company_slug.replace("-", " ").title
+            company = company_slug.replace("-", " ").title()
 
         if not title or not company:
             return None
@@ -145,7 +145,7 @@ class WelcomeToTheJungleScraper(BaseScraper):
             text = _clean(tag.get_text(" ", strip=True))
             if not text or text == title or text == company or len(text) > 80:
                 continue
-            if "remote" in text.lower or re.search(r",\s*[A-Z]{2}\b", text):
+            if "remote" in text.lower() or re.search(r",\s*[A-Z]{2}\b", text):
                 location = text
                 break
 
@@ -154,7 +154,7 @@ class WelcomeToTheJungleScraper(BaseScraper):
             return None
 
         remote = None
-        if location and "remote" in location.lower:
+        if location and "remote" in location.lower():
             remote = True
 
         return RawJob(

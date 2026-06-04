@@ -50,13 +50,13 @@ def handler(event, context):
              or event.get("httpMethod") \
              or ""
     if method == "GET":
-        return _get
+        return _get()
     if method == "PUT":
         return _put(event)
     return _json(405, {"error": "method not allowed", "method": method})
 
 
-def _get -> dict:
+def _get() -> dict:
     """Return all prefs as a flat dict. Missing keys default to sensible
     empties on the client side; we return only what's actually stored."""
     prefs = db.get_prefs(_USER_ID)
@@ -78,7 +78,7 @@ def _put(event) -> dict:
     if len(key) > _MAX_KEY_CHARS:
         return _json(400, {"error": "config_key too long", "max_chars": _MAX_KEY_CHARS})
     if value is None:
-        return _json(400, {"error": "missing 'value' (use  or {} to clear)"})
+        return _json(400, {"error": "missing 'value' (use [] or {} to clear)"})
 
     # Bound the serialized value size before it ever reaches DynamoDB.
     try:

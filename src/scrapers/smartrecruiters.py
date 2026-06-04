@@ -31,7 +31,7 @@ Error handling mirrors GreenhouseScraper:
   - 404 on a single posting detail → listing removed between list and
     detail; warn, skip that one posting, continue with the rest.
   - Other errors on list → re-raise (BaseScraper records the run).
-  - Other errors on a single detail → caught per-item by scrape_run.
+  - Other errors on a single detail → caught per-item by scrape_run().
 """
 import re
 from typing import Iterable, Optional
@@ -59,7 +59,7 @@ def _strip_html(html: str) -> str:
     text = re.sub(r"&lt;", "<", text)
     text = re.sub(r"&gt;", ">", text)
     text = re.sub(r"&#\d+;", " ", text)
-    return re.sub(r"\s+", " ", text).strip
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _join_jobad_sections(jobad: dict) -> str:
@@ -76,7 +76,7 @@ def _join_jobad_sections(jobad: dict) -> str:
     All fields are optional. `text` is HTML.
     """
     sections = (jobad or {}).get("sections") or {}
-    chunks: list[str] = 
+    chunks: list[str] = []
     # Deterministic order — keeps the stored description diff-stable
     # across re-fetches even though dict order is now insertion-stable.
     for key in (
@@ -119,7 +119,7 @@ class SmartRecruitersScraper(BaseScraper):
         Each yielded dict has:
           * the full DETAIL response (description, applyUrl, etc.)
           * a `_company_meta` key with the companies.yaml record (tier,
-            industry, name) so parse can enrich the RawJob.
+            industry, name) so parse() can enrich the RawJob.
         """
         companies = load_ats_companies("smartrecruiters")
         if not companies:
@@ -168,7 +168,7 @@ class SmartRecruitersScraper(BaseScraper):
                 "limit":  min(self.LIST_PAGE_SIZE, max_jobs - seen),
             }
 
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     list_url,
@@ -191,10 +191,10 @@ class SmartRecruitersScraper(BaseScraper):
                     hint=f"Verify at https://jobs.smartrecruiters.com/{company_id}",
                 )
                 return
-            resp.raise_for_status
-            data = resp.json
+            resp.raise_for_status()
+            data = resp.json()
 
-            page = data.get("content") or 
+            page = data.get("content") or []
             if not page:
                 # Clean end-of-list — SmartRecruiters returns empty content
                 # once offset exceeds totalFound.
@@ -211,8 +211,8 @@ class SmartRecruitersScraper(BaseScraper):
                 detail = self._fetch_detail(company_id, posting_id)
                 if detail is None:
                     # Couldn't retrieve the full record — skip quietly.
-                    # Per-item scrape_run error handling would also let
-                    # us yield the list row and parse would bail on
+                    # Per-item scrape_run() error handling would also let
+                    # us yield the list row and parse() would bail on
                     # missing description, but this keeps malformed rows
                     # out of the raw S3 archive.
                     continue
@@ -237,7 +237,7 @@ class SmartRecruitersScraper(BaseScraper):
         from common.logging import log
 
         url = f"{self.API_BASE}/{company_id}/postings/{posting_id}"
-        self._throttle
+        self._throttle()
         try:
             resp = requests.get(
                 url,
@@ -272,7 +272,7 @@ class SmartRecruitersScraper(BaseScraper):
             return None
 
         try:
-            return resp.json
+            return resp.json()
         except Exception as exc:
             log.warn(
                 "smartrecruiters_detail_json_err",
@@ -301,7 +301,7 @@ class SmartRecruitersScraper(BaseScraper):
           _company_meta → our companies.yaml enrichment
         """
         posting_id = payload.get("id")
-        title      = (payload.get("name") or "").strip
+        title      = (payload.get("name") or "").strip()
         if not posting_id or not title:
             return None
 
@@ -346,7 +346,7 @@ class SmartRecruitersScraper(BaseScraper):
 
         # ---- Posted-at -----------------------------------------------
         # SR returns ISO8601 with millisecond precision.
-        # BaseScraper.normalize runs canonicalize_posted_at on it.
+        # BaseScraper.normalize() runs canonicalize_posted_at() on it.
         posted_at = payload.get("releasedDate") or None
 
         return RawJob(
@@ -366,7 +366,7 @@ class SmartRecruitersScraper(BaseScraper):
 
     def normalize(self, job: RawJob) -> dict:
         """Inject company_tier into the stored row for scoring modifiers."""
-        row = super.normalize(job)
+        row = super().normalize(job)
         if job.raw:
             tier = job.raw.get("company_tier")
             if tier:

@@ -26,7 +26,7 @@ def _dummy_aws_env(monkeypatch):
 @pytest.fixture
 def aws(monkeypatch):
     """Moto context + four DynamoDB tables + one S3 bucket."""
-    with mock_aws:
+    with mock_aws():
         ddb = boto3.resource("dynamodb", region_name="us-east-1")
 
         # -- Jobs (mirrors the real schema in template.yaml)
@@ -145,6 +145,6 @@ def aws(monkeypatch):
         # same session that hit /api/jobs/browse will see stale items from
         # earlier mock_aws contexts (the cache is keyed by status, not by
         # table identity).
-        _db.invalidate_browse_cache
+        _db.invalidate_browse_cache()
 
         yield

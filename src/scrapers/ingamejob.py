@@ -49,7 +49,7 @@ _SLUG_RE = re.compile(r"/job/([a-z0-9\-_]+)", re.I)
 def _clean(s: str) -> str:
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 def _icon_text(soup: BeautifulSoup, icon_class: str) -> str:
@@ -74,7 +74,7 @@ class InGameJobScraper(BaseScraper):
     schedule = "cron(30 6 * * ? *)"      # 06:30 UTC daily, with HTML batch
     rate_limit_rps = 1.0
     # 2026-06-03: detail-page descriptions (the listing/card omits the JD).
-    # scrape_run fetches RawJob.url + extracts JSON-LD first, then this
+    # scrape_run() fetches RawJob.url + extracts JSON-LD first, then this
     # CSS selector; populates QoL keyword scoring + the semantic pass.
     auto_fetch_description = True
     _DESC_SELECTOR = 'div.job-view-single-section'
@@ -90,17 +90,17 @@ class InGameJobScraper(BaseScraper):
         cfg = load_source_config(self.source_name)
         max_pages = int(cfg.get("max_pages") or self.DEFAULT_MAX_PAGES)
 
-        seen_slugs: set[str] = set
+        seen_slugs: set[str] = set()
         for page in range(1, max_pages + 1):
             url = self.LIST_URL if page == 1 else f"{self.LIST_URL}?page={page}"
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     url,
                     headers={"User-Agent": self.USER_AGENT, "Accept": "text/html"},
                     timeout=30,
                 )
-                resp.raise_for_status
+                resp.raise_for_status()
             except requests.RequestException:
                 break
 
@@ -172,7 +172,7 @@ class InGameJobScraper(BaseScraper):
 
         # Posted-at: "Posted 9 hours ago" / "Posted 2 days ago". The site
         # does NOT expose an absolute date on the card, so we leave
-        # posted_at=None and let BaseScraper.normalize fill in scrape time.
+        # posted_at=None and let BaseScraper.normalize() fill in scrape time.
         # (Daily cadence makes "today" close enough for ranking.)
         posted_at = None
 
@@ -182,7 +182,7 @@ class InGameJobScraper(BaseScraper):
         # Remote inference: location text mentions remote/worldwide.
         remote = None
         if location:
-            lower = location.lower
+            lower = location.lower()
             if "remote" in lower or "worldwide" in lower or "anywhere" in lower:
                 remote = True
             elif "office" in lower or "onsite" in lower or "on-site" in lower:

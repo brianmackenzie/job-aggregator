@@ -56,7 +56,7 @@ def test_put_job_preserves_user_state(aws):
     current = db.get_job("remoteok:2")
     current["status"] = "applied"
     current["user_notes"] = "emailed alice@acme"
-    db.jobs_table.put_item(Item=current)
+    db.jobs_table().put_item(Item=current)
 
     # Re-scrape brings a fresh title — but status/notes stay put.
     db.put_job(_make_job("remoteok:2", title="New Title"))

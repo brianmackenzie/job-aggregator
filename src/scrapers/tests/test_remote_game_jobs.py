@@ -1,6 +1,6 @@
-"""Tests for src/scrapers/remote_game_jobs.py — parse against fixture HTML.
+"""Tests for src/scrapers/remote_game_jobs.py — parse() against fixture HTML.
 
-No HTTP. fetch is exercised by the live smoke test.
+No HTTP. fetch() is exercised by the live smoke test.
 """
 from scrapers.remote_game_jobs import RemoteGameJobsScraper
 
@@ -60,9 +60,9 @@ def _payload(html: str = _CARD_HTML,
     }
 
 
-def test_parse_canonical_card:
-    s   = RemoteGameJobsScraper
-    raw = s.parse(_payload)
+def test_parse_canonical_card():
+    s   = RemoteGameJobsScraper()
+    raw = s.parse(_payload())
     assert raw is not None
     assert raw.title    == "Head of Community & Growth"
     assert raw.company  == "DreamForge"
@@ -77,10 +77,10 @@ def test_parse_canonical_card:
                              "remote-job-f7785ffb")
 
 
-def test_parse_falls_back_to_anchor_title_attribute:
+def test_parse_falls_back_to_anchor_title_attribute():
     """If structured strong.f-20 / small.f-15 are missing, parse the
     anchor's title attribute: '<Company> is hiring <Role> (Remote Job)'."""
-    s   = RemoteGameJobsScraper
+    s   = RemoteGameJobsScraper()
     raw = s.parse(_payload(html=_CARD_HTML_TITLE_ONLY,
                             href="https://remotegamejobs.com/jobs/saguni-monetization-designer"))
     assert raw is not None
@@ -89,8 +89,8 @@ def test_parse_falls_back_to_anchor_title_attribute:
     assert raw.remote is True
 
 
-def test_parse_skips_when_no_company_or_title:
-    s = RemoteGameJobsScraper
+def test_parse_skips_when_no_company_or_title():
+    s = RemoteGameJobsScraper()
     bare = """
     <div class="job-box">
       <a href="https://remotegamejobs.com/jobs/x"></a>
@@ -100,6 +100,6 @@ def test_parse_skips_when_no_company_or_title:
                              href="https://remotegamejobs.com/jobs/x")) is None
 
 
-def test_parse_skips_when_href_blank:
-    s = RemoteGameJobsScraper
+def test_parse_skips_when_href_blank():
+    s = RemoteGameJobsScraper()
     assert s.parse({"_href": "", "_url": "", "_html": _CARD_HTML}) is None

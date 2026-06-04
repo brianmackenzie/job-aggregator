@@ -93,7 +93,7 @@ then blended with this algo score (per `semantic.blend_weight_*`).
 - `industry_buckets`, `company_industry_map`, `industry_keywords` —
   which industries you WANT, scored 0-10. Rebuild for your
   target industries.
-- `location:` — preset labels (`nyc_hybrid_2d`, `nj_office`) are
+- `location:` — preset labels (`nyc_hybrid_2d`, `local_metro`) are
   the original author-specific. Rename the presets to match YOUR home base
   and update `location.keywords.commutable`.
 - `gates:` — some are shared defaults (e.g. intern-filter). Others
@@ -192,7 +192,7 @@ industry, role_type, company_group.
 
 **What to change:**
 - `company_groups:` — the original author's personal groupings
-  (`gaming_aaa`, `streaming_media`, `dream_culture`, etc.).
+  (`gaming_aaa`, `media_streaming`, `dream_culture`, etc.).
   Delete or rewrite to match YOUR affinity buckets.
 - `qol:` — quality-of-life weights. `salary_floor` is the bottom of
   the salary band you consider acceptable — raise or lower to match

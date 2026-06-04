@@ -101,8 +101,8 @@ def detect_engagement(job: dict) -> str:
     See module docstring for the detection priority. Reads job['title'] and
     job['description']; tolerates either being missing.
     """
-    title = (job.get("title") or "").lower
-    desc  = (job.get("description") or "").lower
+    title = (job.get("title") or "").lower()
+    desc  = (job.get("description") or "").lower()
     # Match against title FIRST — title-shaped engagement signals are far
     # more reliable than description mentions. A JD that says "we hired
     # consultants in the past" should not flip a perm role to "contract".
@@ -126,7 +126,7 @@ def detect_engagement(job: dict) -> str:
     # (We rarely return "unclear" — most JDs have enough title text to
     # tell. Reserve "unclear" for jobs where title is empty / placeholder,
     # which would already be a data-quality issue elsewhere.)
-    if not title.strip:
+    if not title.strip():
         return "unclear"
     return "fulltime"
 

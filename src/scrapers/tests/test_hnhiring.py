@@ -1,9 +1,9 @@
-"""Tests for src/scrapers/hnhiring.py — parse only."""
+"""Tests for src/scrapers/hnhiring.py — parse() only."""
 from scrapers.hnhiring import HNHiringScraper
 
 
-def test_parse_canonical_pipe_format:
-    s = HNHiringScraper
+def test_parse_canonical_pipe_format():
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "39123456",
         "parent_id": 39000000,
@@ -19,8 +19,8 @@ def test_parse_canonical_pipe_format:
     assert raw.url == "https://news.ycombinator.com/item?id=39123456"
 
 
-def test_parse_strips_html_entities:
-    s = HNHiringScraper
+def test_parse_strips_html_entities():
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "Acme &amp; Co | Engineer | NY<br>More info below.",
@@ -30,27 +30,27 @@ def test_parse_strips_html_entities:
     assert raw.title == "Engineer"
 
 
-def test_parse_no_pipes_skips_if_implausible:
+def test_parse_no_pipes_skips_if_implausible():
     """A freeform comment with no | splits shouldn't invent structure."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     # Long single-line comments are likely narrative, not jobs.
     long_line = "A" * 200
     assert s.parse({"objectID": "1", "text": long_line}) is None
 
 
-def test_parse_empty_text_skips:
-    s = HNHiringScraper
+def test_parse_empty_text_skips():
+    s = HNHiringScraper()
     assert s.parse({"objectID": "1", "text": ""}) is None
     assert s.parse({"objectID": "1"}) is None
 
 
-def test_parse_missing_id_skips:
-    s = HNHiringScraper
+def test_parse_missing_id_skips():
+    s = HNHiringScraper()
     assert s.parse({"text": "Acme | Eng"}) is None
 
 
-def test_parse_detects_remote_flag:
-    s = HNHiringScraper
+def test_parse_detects_remote_flag():
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "Acme | Engineer | Onsite NY only",
@@ -65,9 +65,9 @@ def test_parse_detects_remote_flag:
 # that scored 50+ from company/industry modifiers).
 # ---------------------------------------------------------------------------
 
-def test_parse_skips_when_title_segment_is_url:
+def test_parse_skips_when_title_segment_is_url():
     """CrazyGames-shape: 'CrazyGames | https://about.crazygames.com/ | ...'"""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "CrazyGames | https://about.crazygames.com/ | Remote (Europe)",
@@ -76,9 +76,9 @@ def test_parse_skips_when_title_segment_is_url:
     assert raw is None
 
 
-def test_parse_skips_when_title_segment_is_location:
+def test_parse_skips_when_title_segment_is_location():
     """Cyngn-shape: 'Cyngn | Mountain View, CA | https://cyngn.com'"""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "Cyngn | Mountain View, CA | https://cyngn.com",
@@ -86,9 +86,9 @@ def test_parse_skips_when_title_segment_is_location:
     assert raw is None
 
 
-def test_parse_skips_when_title_segment_is_remote_tag:
+def test_parse_skips_when_title_segment_is_remote_tag():
     """Fold-shape: 'Fold | Remote (US Only) | ...'"""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "Fold | Remote (US Only) | bitcoin rewards card",
@@ -96,9 +96,9 @@ def test_parse_skips_when_title_segment_is_remote_tag:
     assert raw is None
 
 
-def test_parse_skips_when_title_is_boilerplate:
+def test_parse_skips_when_title_is_boilerplate():
     """Russell Tobin-shape: 'Russell Tobin | RTA Posted Job Description | ...'"""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "Russell Tobin | RTA Posted Job Description | NY",
@@ -106,9 +106,9 @@ def test_parse_skips_when_title_is_boilerplate:
     assert raw is None
 
 
-def test_parse_skips_tagline_with_no_role_keywords:
+def test_parse_skips_tagline_with_no_role_keywords():
     """Neon Health-shape: 'Neon Health | AI in healthcare | Remote'"""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "Neon Health | AI in healthcare | Remote",
@@ -117,9 +117,9 @@ def test_parse_skips_tagline_with_no_role_keywords:
     assert raw is None
 
 
-def test_parse_picks_role_segment_past_url:
+def test_parse_picks_role_segment_past_url():
     """If parts[1] is a URL but parts[2] is a real role, use parts[2]."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "Acme | https://acme.example | Senior Backend Engineer | Remote",
@@ -128,9 +128,9 @@ def test_parse_picks_role_segment_past_url:
     assert raw.title == "Senior Backend Engineer"
 
 
-def test_parse_picks_role_segment_past_location:
+def test_parse_picks_role_segment_past_location():
     """If parts[1] is a location but parts[2] is the role, use parts[2]."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "Acme | Atlanta, GA | Director of Engineering | Onsite",
@@ -149,10 +149,10 @@ def test_parse_picks_role_segment_past_location:
 # _looks_like_title; (2) parser always assumed parts[0]=company.
 # ---------------------------------------------------------------------------
 
-def test_parse_rejects_url_anywhere_in_title_candidate:
+def test_parse_rejects_url_anywhere_in_title_candidate():
     """A segment containing an inline URL must never be picked as the
     title, even if the URL path contains a role keyword substring."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": (
@@ -167,11 +167,11 @@ def test_parse_rejects_url_anywhere_in_title_candidate:
     assert raw is None
 
 
-def test_parse_title_first_fetlife_regression:
+def test_parse_title_first_fetlife_regression():
     """The exact pattern from the semantic-review audit:
     title first, then a salary+URL blob, no clean company segment.
     Company must be recovered from the URL domain."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "47601882",
         "text": (
@@ -185,16 +185,16 @@ def test_parse_title_first_fetlife_regression:
     assert raw.title == "Head of Engineering & Infrastructure"
     # Company recovered from URL domain ("fetlife.com" → "Fetlife").
     # Substring-match-friendly; inner camel-case is not required.
-    assert raw.company.lower == "fetlife"
+    assert raw.company.lower() == "fetlife"
     # Salary pulled out of the head text.
     assert raw.salary_min == 182000
     assert raw.salary_max == 272000
 
 
-def test_parse_title_first_with_clean_company_segment:
+def test_parse_title_first_with_clean_company_segment():
     """Title-first format where parts[1] IS a plausible company — no
     URL needed. parts[0] → title, parts[1] → company."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "Director of Platform Engineering | Acme | Remote US | $220k-$260k",
@@ -206,9 +206,9 @@ def test_parse_title_first_with_clean_company_segment:
     assert raw.salary_max == 260000
 
 
-def test_parse_salary_extraction_in_canonical_format:
+def test_parse_salary_extraction_in_canonical_format():
     """Salary columns should now be populated for the canonical format."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "Acme | Senior Engineer | NY or Remote | $180k-$220k | Python, Go",
@@ -218,9 +218,9 @@ def test_parse_salary_extraction_in_canonical_format:
     assert raw.salary_max == 220000
 
 
-def test_parse_salary_absent_stays_none:
+def test_parse_salary_absent_stays_none():
     """No salary in the head → salary_min / salary_max stay None (not 0)."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "Acme | Senior Engineer | NY or Remote",
@@ -230,12 +230,12 @@ def test_parse_salary_absent_stays_none:
     assert raw.salary_max is None
 
 
-def test_parse_does_not_swap_when_parts0_is_a_real_company:
+def test_parse_does_not_swap_when_parts0_is_a_real_company():
     """Regression guard: a company name with a mildly-titley substring
     (e.g. 'ProductHunt' contains 'product' which is in the GENERAL
     role-keyword list but NOT the STRONG list) must not be treated as
     a title. The canonical format still wins."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "ProductHunt | Senior Engineer | Remote | $180k-$220k",
@@ -245,14 +245,14 @@ def test_parse_does_not_swap_when_parts0_is_a_real_company:
     assert raw.title == "Senior Engineer"
 
 
-def test_parse_does_not_swap_cvector_regression:
+def test_parse_does_not_swap_cvector_regression():
     """Regression: 'CVector' at parts[0] contains 'cto' as letters 3-5
     but is NOT the acronym — it's a company name. The old substring-
     match version of _looks_strongly_like_title falsely flagged it as a
     title candidate and swapped, producing title='CVector' and
     company='New York City (FiDi)'. The new word-boundary pattern must
     leave this row alone."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "47609341",
         "text": (
@@ -267,11 +267,11 @@ def test_parse_does_not_swap_cvector_regression:
     assert raw.title == "Software Engineers, Senior Research Engineer"
 
 
-def test_parse_still_handles_cto_title_correctly:
+def test_parse_still_handles_cto_title_correctly():
     """Counter-regression: 'CTO of Platform | Acme | Remote' must still
     trigger the title-first swap. Word boundaries let real 'CTO' through
     while rejecting embedded 'cto' in 'CVector'."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "CTO of Platform | Acme | Remote | $250k",
@@ -281,7 +281,7 @@ def test_parse_still_handles_cto_title_correctly:
     assert raw.company == "Acme"
 
 
-def test_parse_url_company_strips_careers_subdomain:
+def test_parse_url_company_strips_careers_subdomain():
     """`careers.example.com` and the like should yield 'Example',
     not 'Careers'."""
     from scrapers.hnhiring import _company_from_url
@@ -302,7 +302,7 @@ def test_parse_url_company_strips_careers_subdomain:
 # AND prefer URL-domain over segment scan when a URL is present.
 # ---------------------------------------------------------------------------
 
-def test_looks_like_company_rejects_city_names:
+def test_looks_like_company_rejects_city_names():
     """Bare city names must never be treated as companies."""
     from scrapers.hnhiring import _looks_like_company
     assert _looks_like_company("Chicago") is False
@@ -313,7 +313,7 @@ def test_looks_like_company_rejects_city_names:
     assert _looks_like_company("Chicago Trading Partners") is True
 
 
-def test_looks_like_company_rejects_employment_types:
+def test_looks_like_company_rejects_employment_types():
     """'Full-Time', 'Contract', 'Visa Sponsorship' etc. aren't companies."""
     from scrapers.hnhiring import _looks_like_company
     assert _looks_like_company("Full-Time") is False
@@ -323,11 +323,11 @@ def test_looks_like_company_rejects_employment_types:
     assert _looks_like_company("W2") is False
 
 
-def test_parse_title_first_prefers_url_over_bad_segment:
+def test_parse_title_first_prefers_url_over_bad_segment():
     """Title-first post with a URL and an employment-type segment:
     the URL must win. Pre-fix, parts[1]='Full-Time' was accepted as
     company."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": (
@@ -338,14 +338,14 @@ def test_parse_title_first_prefers_url_over_bad_segment:
     assert raw is not None
     assert raw.title == "Head of Engineering"
     # URL domain wins over the "Full-Time" segment.
-    assert raw.company.lower == "fetlife"
+    assert raw.company.lower() == "fetlife"
 
 
-def test_parse_title_first_skips_when_only_city_and_no_url:
+def test_parse_title_first_skips_when_only_city_and_no_url():
     """Title-first post with a city in parts[1] and NO url: we can't
     recover a real company, so skip rather than invent 'Chicago' as
     the employer."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": "Senior Engineer | Chicago | Onsite",
@@ -354,7 +354,7 @@ def test_parse_title_first_skips_when_only_city_and_no_url:
     assert raw is None
 
 
-def test_company_from_url_rejects_ats_hosts:
+def test_company_from_url_rejects_ats_hosts():
     """A URL pointing to an ATS host (Greenhouse, Lever, etc.) must
     NOT be used as the company name — those are hosting platforms,
     not employers."""
@@ -371,11 +371,11 @@ def test_company_from_url_rejects_ats_hosts:
     assert _company_from_url("https://fetlife.com/jobs/x") == "Fetlife"
 
 
-def test_parse_skips_title_first_when_url_is_only_ats:
+def test_parse_skips_title_first_when_url_is_only_ats():
     """Title-first post whose only URL points to an ATS AND has no
     plausible company segment: must skip. We shouldn't pick the ATS
     as the employer."""
-    s = HNHiringScraper
+    s = HNHiringScraper()
     raw = s.parse({
         "objectID": "1",
         "text": (

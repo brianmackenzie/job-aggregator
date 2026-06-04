@@ -158,7 +158,7 @@ system_prompt: |-
     "geography_match": "strong" | "partial" | "weak" | "none",
     "level_match": "under" | "match" | "over" | "unclear",
     "watchlist_dream": true | false,
-    "life_fit_concerns": ["list", "of", "concerns"] or 
+    "life_fit_concerns": ["list", "of", "concerns"] or []
   }
   ```
 

@@ -31,19 +31,19 @@ from .keywords import (
     CRUNCH_COS,
     CRUNCH_REDUCED,
     HRC100,
-    KW_CCG,
+    KW_MARKETPLACE_SIG,
     KW_CRUNCH_PACE,
     KW_CULTURE_REDFLAGS,
     KW_D2C_PAYMENTS,
     KW_FAMILY_FRIENDLY,
-    KW_GAMING_CULTURE,
+    KW_DOMAIN_CULTURE,
     KW_HANDS_ON_CODE,
     KW_HELPING_PEOPLE,
-    KW_IMMERSIVE,
+    KW_EXPERIENTIAL,
     KW_INTERIM,
     KW_LGBTQ,
     KW_MA_INTEGRATION,
-    KW_MUSIC,
+    KW_CREATOR,
     KW_PGM_ARCH,
     KW_SENIOR_TITLES,
     KW_STRATEGY,
@@ -73,7 +73,7 @@ def _score_role_fit(title: str, description: str) -> float:
     5. D2C / payments avoidance (inverted penalty)
     6. Hands-on coding avoidance (inverted penalty)
     """
-    text = f"{title} {description}".lower
+    text = f"{title} {description}".lower()
 
     # Sub-factor 1: Strategy signals (+2 per unique keyword hit, cap 10).
     s_strategy = min(10.0, keyword_hits(text, KW_STRATEGY) * 2.0)
@@ -107,7 +107,7 @@ def _leadership_score(title: str) -> float:
     scoring, but this function is also used for _score_career_trajectory, so
     correctness matters regardless.
     """
-    lo = title.lower
+    lo = title.lower()
 
     # Detect IC "Principal [Engineer/Scientist/Designer/Developer/Researcher]"
     # the word "principal" here is a seniority band, not a leadership title.
@@ -207,7 +207,7 @@ def _score_compensation(salary_min: Optional[int], salary_max: Optional[int],
         "healthcare", "dental", "vision", "401k", "401(k)", "pto",
         "paid time off", "equity", "bonus",
     ]
-    benefit_hits = keyword_hits(description.lower, [b.lower for b in benefit_kws])
+    benefit_hits = keyword_hits(description.lower(), [b.lower() for b in benefit_kws])
     if benefit_hits >= 4:
         benefits_score = 10.0
     elif benefit_hits >= 2:
@@ -218,7 +218,7 @@ def _score_compensation(salary_min: Optional[int], salary_max: Optional[int],
         benefits_score = neutral  # Neutral — data not available
 
     # Equity modifier (added to the averaged comp+benefits score).
-    desc_lo = description.lower
+    desc_lo = description.lower()
     equity_mod = 0.0
     if any(t in desc_lo for t in ["rsu", "rsus", "restricted stock"]):
         equity_mod = 1.0        # Public company liquid RSUs — most valuable
@@ -239,7 +239,7 @@ def _score_compensation(salary_min: Optional[int], salary_max: Optional[int],
 # ---------------------------------------------------------------------------
 
 # The geographic SCORE (0-10) is computed in gates.py alongside the gate
-# multiplier. The engine receives it as a parameter from evaluate_all_gates.
+# multiplier. The engine receives it as a parameter from evaluate_all_gates().
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +252,7 @@ def _score_passion(text: str, company_normalized: str, industry: str = "") -> fl
     Flags:
       +2 "Helping people" mission signal
       +2 Gaming / interactive entertainment culture OR company is in a
-         gaming-adjacent industry bucket (fix: Roblox/Epic JDs
+         gaming-adjacent industry bucket (fix: a large platform company/Epic JDs
          often don't say "f2p" or "live service" in so many words — they
          talk about "players", "creators", "avatars". Awarding credit
          based on the company's industry bucket ensures gaming studios
@@ -271,38 +271,38 @@ def _score_passion(text: str, company_normalized: str, industry: str = "") -> fl
     """
     # Industries that count as "gaming-adjacent" for the automatic
     # gaming-culture credit (regardless of JD wording).
-    GAMING_ADJACENT = {
-        "gaming_publisher_platform",
-        "gaming_b2b_infrastructure",
-        "digital_tcg_ccg",
-        "immersive_lbe",
-        "gaming_accessibility_nonprofit",
-        "gaming_vc_pe_operating",
+    DOMAIN_ADJACENT = {
+        "consumer_platform",
+        "platform_infra",
+        "consumer_marketplace",
+        "experiential_venue",
+        "accessibility_nonprofit",
+        "vc_pe_operating",
     }
 
     score = 0.0
     if any_match(text, KW_HELPING_PEOPLE):              score += 2.0
 
     # Gaming culture: fire if JD keywords match OR company is gaming-adjacent.
-    if any_match(text, KW_GAMING_CULTURE) or industry in GAMING_ADJACENT:
+    if any_match(text, KW_DOMAIN_CULTURE) or industry in DOMAIN_ADJACENT:
         score += 2.0
 
-    if any_match(text, KW_MUSIC):                       score += 2.0
-    if any_match(text, KW_IMMERSIVE):                   score += 2.0
+    if any_match(text, KW_CREATOR):                       score += 2.0
+    if any_match(text, KW_EXPERIENTIAL):                   score += 2.0
 
     # Strategy bucket: tightened in . Only award if the company is
     # in a passion-track industry (gaming, music, immersive, media). Before
     # this fix, Gartner/Forrester/NBCU JDs hit KW_STRATEGY heavily and got
     # a free +2 that was supposed to go to strategy-oriented gaming roles.
-    STRATEGY_PASSION_INDUSTRIES = GAMING_ADJACENT | {
-        "music_tech",
-        "streaming_media",
-        "sports_betting_tech",
+    STRATEGY_PASSION_INDUSTRIES = DOMAIN_ADJACENT | {
+        "creator_tech",
+        "media_streaming",
+        "transaction_platform",
     }
     if any_match(text, KW_STRATEGY) and industry in STRATEGY_PASSION_INDUSTRIES:
         score += 2.0
 
-    if any_match(text, KW_CCG):                         score += 2.0
+    if any_match(text, KW_MARKETPLACE_SIG):                         score += 2.0
 
     # Accessibility / mental-health: tightened in . Only award if
     # company is gaming-adjacent. Every tech company's HR boilerplate
@@ -312,7 +312,7 @@ def _score_passion(text: str, company_normalized: str, industry: str = "") -> fl
         "accessible gaming", "ablegamers", "take this", "games for change",
         "suicide prevention",
     ])
-    if accessibility_hit and industry in GAMING_ADJACENT:
+    if accessibility_hit and industry in DOMAIN_ADJACENT:
         score += 2.0
 
     return min(10.0, score)
@@ -327,9 +327,9 @@ def _score_work_life(text: str, company_normalized: str) -> float:
     score = 7.0
 
     # Company-level crunch reputation penalty.
-    co = company_normalized.lower
+    co = company_normalized.lower()
     if co in CRUNCH_REDUCED:
-        score -= 1.0   # Reduced penalty — Riot Games has documented reform
+        score -= 1.0   # Reduced penalty — a game studio has documented reform
     elif co in CRUNCH_COS:
         score -= 2.5   # Standard crunch penalty
 
@@ -368,7 +368,7 @@ def _score_company_health(company_normalized: str, description: str) -> float:
     those enrichments are a future phase. We detect what we can from the JD.
     """
     score = 7.0
-    desc_lo = description.lower
+    desc_lo = description.lower()
 
     # Positive: funding maturity signals.
     if any(t in desc_lo for t in ["nasdaq", "nyse", "publicly traded", "public company"]):
@@ -397,8 +397,8 @@ def _score_company_health(company_normalized: str, description: str) -> float:
 
 def _score_career_trajectory(title: str, description: str, company_normalized: str) -> float:
     """Title level + reporting line + scope + employer brand — averaged."""
-    lo_title = title.lower
-    lo_desc  = description.lower
+    lo_title = title.lower()
+    lo_desc  = description.lower()
 
     # Title level (0-10).
     s_title = _leadership_score(title)  # Reuse same function as role_fit.
@@ -428,9 +428,9 @@ def _score_career_trajectory(title: str, description: str, company_normalized: s
 
     # Employer brand (Tier 1 target companies get a bump).
     is_tier1 = company_normalized in {
-        "riot games", "roblox", "epic games", "netflix", "disney", "nbcuniversal",
+        "a game studio", "a large platform company", "a game studio", "netflix", "disney", "nbcuniversal",
         "warner bros discovery", "sony interactive entertainment", "microsoft",
-        "gartner", "forrester", "draftkings", "fanduel", "betmgm",
+        "gartner", "forrester", "a betting platform", "a wagering platform", "a betting platform",
     }
     s_brand = 8.0 if is_tier1 else 6.0
 
@@ -454,7 +454,7 @@ def _score_cultural(company_normalized: str, text: str) -> float:
                                  "merit-based only", "end dei", "no pronouns"]):
         return 0.0
 
-    co = company_normalized.lower.strip
+    co = company_normalized.lower().strip()
     if co in HRC100:
         return 10.0
 
@@ -472,7 +472,7 @@ def _score_cultural(company_normalized: str, text: str) -> float:
 
 def _score_engagement(text: str) -> float:
     """Full-time permanent = 9, interim = 10, fractional = 9, advisory = 7."""
-    lo = text.lower
+    lo = text.lower()
 
     if any(t in lo for t in ["interim", "fixed-term", "ftc", "short-term assignment",
                                "6-month", "12-month", "day rate"]):
@@ -549,7 +549,7 @@ def score(job: dict, prefs: dict) -> dict:
             "track":             track,
             "breakdown":         {},
             "gates_triggered":   hard_gates,
-            "modifiers_applied": ,
+            "modifiers_applied": [],
         }
 
     # ------------------------------------------------------------------
@@ -602,7 +602,7 @@ def score(job: dict, prefs: dict) -> dict:
         "score":             final,
         "tier":              tier,
         "track":             track,
-        "breakdown":         {k: round(v, 2) for k, v in cat_scores.items},
-        "gates_triggered":   ,
+        "breakdown":         {k: round(v, 2) for k, v in cat_scores.items()},
+        "gates_triggered":   [],
         "modifiers_applied": modifiers_applied,
     }

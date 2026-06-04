@@ -11,6 +11,6 @@ from pathlib import Path
 
 # Insert src/ once, at the front, so it takes priority over any installed
 # packages with the same names.
-_SRC = str(Path(__file__).resolve.parent)
+_SRC = str(Path(__file__).resolve().parent)
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)

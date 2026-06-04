@@ -1,4 +1,4 @@
-"""Tests for src/scrapers/gamesindustry.py — parse against fixture HTML."""
+"""Tests for src/scrapers/gamesindustry.py — parse() against fixture HTML."""
 from scrapers.gamesindustry import GamesIndustryScraper
 
 
@@ -27,9 +27,9 @@ def _payload(html: str = _CARD, href: str = "/jobs/lead-producer-example-12345")
     }
 
 
-def test_parse_canonical_card:
-    s   = GamesIndustryScraper
-    raw = s.parse(_payload)
+def test_parse_canonical_card():
+    s   = GamesIndustryScraper()
+    raw = s.parse(_payload())
     assert raw is not None
     assert raw.title     == "Lead Producer"
     assert raw.company   == "Example Studio"
@@ -38,8 +38,8 @@ def test_parse_canonical_card:
     assert raw.remote is None
 
 
-def test_parse_remote_inferred:
-    s   = GamesIndustryScraper
+def test_parse_remote_inferred():
+    s   = GamesIndustryScraper()
     raw = s.parse(_payload(html=_CARD_REMOTE,
                             href="/job/director-of-product-12345"))
     assert raw is not None
@@ -48,24 +48,24 @@ def test_parse_remote_inferred:
     assert raw.remote is True
 
 
-def test_parse_skips_when_no_company:
-    s = GamesIndustryScraper
+def test_parse_skips_when_no_company():
+    s = GamesIndustryScraper()
     no_company = """
     <div><h2>Director</h2><span class="location">London</span></div>
     """
     assert s.parse(_payload(html=no_company, href="/jobs/x")) is None
 
 
-def test_parse_skips_when_no_title:
-    s = GamesIndustryScraper
+def test_parse_skips_when_no_title():
+    s = GamesIndustryScraper()
     no_title = """
     <div><span class="company">Acme</span><span class="location">London</span></div>
     """
     assert s.parse(_payload(html=no_title, href="/jobs/x")) is None
 
 
-def test_parse_skips_when_href_blank:
-    s = GamesIndustryScraper
+def test_parse_skips_when_href_blank():
+    s = GamesIndustryScraper()
     assert s.parse({"_href": "", "_url": "", "_html": _CARD}) is None
 
 
@@ -112,9 +112,9 @@ _LIVE_CARD_HTML = """
 """
 
 
-def test_parse_live_gamesindustry_card_shape:
+def test_parse_live_gamesindustry_card_shape():
     """Locked-in fixture from a real 2026-04 listing payload."""
-    s   = GamesIndustryScraper
+    s   = GamesIndustryScraper()
     raw = s.parse({
         "_href": "https://jobs.gamesindustry.biz/job/talent-acquisition-partner-fixed-term-43935",
         "_url":  "https://jobs.gamesindustry.biz/job/talent-acquisition-partner-fixed-term-43935",

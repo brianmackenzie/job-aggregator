@@ -23,7 +23,7 @@ class _Log:
     # The JSON record still uses the key "event" for the call site's name.
     def _emit(self, level: str, name: str, **fields: Any) -> None:
         record = {
-            "t": time.time,
+            "t": time.time(),
             "level": level,
             "event": name,
         }
@@ -31,7 +31,7 @@ class _Log:
         # default=str so Decimal/datetime/etc. serialize without blowing up.
         sys.stdout.write(json.dumps(record, default=str) + "\n")
         # Flush eagerly so Lambda logs appear promptly in CloudWatch.
-        sys.stdout.flush
+        sys.stdout.flush()
 
     def info(self, name: str, **fields: Any) -> None:
         self._emit("info", name, **fields)
@@ -44,4 +44,4 @@ class _Log:
 
 
 # Importers use this singleton. No configuration knobs — keep it boring.
-log = _Log
+log = _Log()

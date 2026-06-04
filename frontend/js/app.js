@@ -20,20 +20,20 @@
    semantics the server uses (db.query_jobs_for_browse).
    ===================================================================== */
 
-(function  {
+(function () {
 
   /* ---------- Default state ---------- */
   // All multi-value filters are arrays so we can JSON-compare and
   // serialize cleanly into comma-separated query-string values.
-  const defaultState =  => ({
+  const defaultState = () => ({
     status:           'active',
-    industries:       ,
-    role_types:       ,
-    company_groups:   ,
-    work_modes:       ,
+    industries:       [],
+    role_types:       [],
+    company_groups:   [],
+    work_modes:       [],
     // categorical engagement chip. Server filter only —
     // there is no algo weight on this any more.
-    engagement_types: ,
+    engagement_types: [],
     min_score:        0,
     min_qol:        0,
     min_salary:     0,
@@ -44,10 +44,10 @@
     offset:         0,
   });
 
-  let state         = readStateFromUrl;
+  let state         = readStateFromUrl();
   let taxonomy      = null;       // resolved on first load
   let lastResp      = null;       // last /browse response (for pagination)
-  let loadedRows    = ;         // accumulated across "Load more" pages
+  let loadedRows    = [];         // accumulated across "Load more" pages
   let inflight      = null;       // AbortController for current fetch
 
   /* multi-select state. Lives outside `state` because
@@ -58,7 +58,7 @@
        a successful bulk action (the cleared rows would no longer match
        the active filter anyway, so re-render is the natural reset). */
   let selectMode = false;
-  let selectedIds = new Set;
+  let selectedIds = new Set();
 
   /* DOM refs filled on DOMContentLoaded */
   let topbarSubtitle, searchInput, sortSelect, openFiltersBtn, closeFiltersBtn,
@@ -71,10 +71,10 @@
 
   document.addEventListener('DOMContentLoaded', init);
 
-  async function init {
-    cacheDom;
-    wireStaticEvents;
-    hydrateSliders;
+  async function init() {
+    cacheDom();
+    wireStaticEvents();
+    hydrateSliders();
     searchInput.value = state.q;
 
     // Kick off taxonomy + first page in parallel; the cards render only
@@ -85,11 +85,11 @@
         loadPage({ replace: true }),
       ]);
       taxonomy = tax;
-      renderFacets;
-      renderStatusTabs;
-      renderSortOptions;
-      renderActiveChips;
-      renderJobs;   // re-render now that taxonomy labels are available
+      renderFacets();
+      renderStatusTabs();
+      renderSortOptions();
+      renderActiveChips();
+      renderJobs();   // re-render now that taxonomy labels are available
     } catch (err) {
       // Taxonomy is the only must-have. If it failed but jobs loaded,
       // we'll show the cards with raw values instead of human labels.
@@ -100,7 +100,7 @@
   /* =====================================================================
      DOM cache + static wiring
      ===================================================================== */
-  function cacheDom {
+  function cacheDom() {
     topbarSubtitle   = document.getElementById('topbar-subtitle');
     searchInput      = document.getElementById('search-input');
     sortSelect       = document.getElementById('sort-select');
@@ -136,42 +136,42 @@
     bulkArchiveBtn   = document.getElementById('bulk-archive');
   }
 
-  function wireStaticEvents {
+  function wireStaticEvents() {
     // Search box: SERVER-SIDE substring filter.
     // Pre-this filtered only the loaded page in JS, which was
     // useless as soon as the matching row was past the first page —
-    // searching "FanDuel" wouldn't find a FanDuel posting on page 5.
+    // searching "a wagering platform" wouldn't find a a wagering platform posting on page 5.
     // Now we send `q=` to /api/jobs/browse and refetch from offset 0.
     // Debounced 250ms so each keystroke isn't an API call.
-    searchInput.addEventListener('input', debounce( => {
-      state.q = searchInput.value.trim;
-      reloadFromZero;
+    searchInput.addEventListener('input', debounce(() => {
+      state.q = searchInput.value.trim();
+      reloadFromZero();
     }, 250));
 
     // Sort dropdown
-    sortSelect.addEventListener('change',  => {
+    sortSelect.addEventListener('change', () => {
       state.sort_by = sortSelect.value;
       // direction is implicit per option (newest=desc, oldest=asc, etc.)
       state.sort_dir = (state.sort_by === 'oldest') ? 'asc' : 'desc';
       state.offset = 0;
-      reloadFromZero;
+      reloadFromZero();
     });
 
     // Sliders — all three rebind to fetch (debounced 250ms).
-    minScoreEl.addEventListener('input', debounce( => {
+    minScoreEl.addEventListener('input', debounce(() => {
       state.min_score = parseInt(minScoreEl.value, 10) || 0;
       minScoreOut.textContent = state.min_score;
-      reloadFromZero;
+      reloadFromZero();
     }, 250));
-    minQolEl.addEventListener('input', debounce( => {
+    minQolEl.addEventListener('input', debounce(() => {
       state.min_qol = parseInt(minQolEl.value, 10) || 0;
       minQolOut.textContent = state.min_qol;
-      reloadFromZero;
+      reloadFromZero();
     }, 250));
-    minSalaryEl.addEventListener('input', debounce( => {
+    minSalaryEl.addEventListener('input', debounce(() => {
       state.min_salary = parseInt(minSalaryEl.value, 10) || 0;
       minSalaryOut.textContent = formatSalary(state.min_salary);
-      reloadFromZero;
+      reloadFromZero();
     }, 250));
 
     // Drawer open/close on mobile
@@ -182,18 +182,18 @@
     resetFiltersBtn.addEventListener('click', resetAll);
 
     // Load more — appends another page to the loadedRows.
-    loadMoreBtn.addEventListener('click',  => {
+    loadMoreBtn.addEventListener('click', () => {
       state.offset += state.limit;
       loadPage({ replace: false });
     });
 
     // Browser back/forward — re-read state from URL.
-    window.addEventListener('popstate',  => {
-      state = readStateFromUrl;
-      hydrateSliders;
+    window.addEventListener('popstate', () => {
+      state = readStateFromUrl();
+      hydrateSliders();
       searchInput.value = state.q;
       if (sortSelect && taxonomy) sortSelect.value = state.sort_by;
-      reloadFromZero;
+      reloadFromZero();
     });
 
     // -----------------------------------------------------------------
@@ -203,12 +203,12 @@
     // Toggle select mode. Entering shows the toolbar + checkboxes;
     // exiting hides them and clears the selection (so a stale checkbox
     // state can never linger across mode flips).
-    toggleSelectBtn.addEventListener('click',  => {
+    toggleSelectBtn.addEventListener('click', () => {
       setSelectMode(!selectMode);
     });
 
     // "All" — check every currently-loaded card.
-    bulkSelectAllBtn.addEventListener('click',  => {
+    bulkSelectAllBtn.addEventListener('click', () => {
       // Bug fix: if the user hits "All" without having toggled
       // Select first, the cards have no <input class="bulk-check"> DOM
       // yet — renderCard only emits checkbox markup while selectMode is
@@ -235,12 +235,12 @@
       jobCardsEl.querySelectorAll('.job-card').forEach(card => {
         card.classList.add('is-selected');
       });
-      updateBulkToolbar;
+      updateBulkToolbar();
     });
 
     // "Clear" — uncheck everything; toolbar count drops to 0.
-    bulkClearBtn.addEventListener('click',  => {
-      selectedIds.clear;
+    bulkClearBtn.addEventListener('click', () => {
+      selectedIds.clear();
       jobCardsEl.querySelectorAll('input.bulk-check').forEach(cb => {
         cb.checked = false;
       });
@@ -252,16 +252,16 @@
       jobCardsEl.querySelectorAll('.job-card.is-selected').forEach(card => {
         card.classList.remove('is-selected');
       });
-      updateBulkToolbar;
+      updateBulkToolbar();
     });
 
     // "Save selected" — bulk save → reload (saved rows leave the active feed).
-    bulkSaveBtn.addEventListener('click',  => {
+    bulkSaveBtn.addEventListener('click', () => {
       runBulkAction('save');
     });
 
     // "Archive selected" — bulk archive → reload.
-    bulkArchiveBtn.addEventListener('click',  => {
+    bulkArchiveBtn.addEventListener('click', () => {
       runBulkAction('skip');
     });
 
@@ -275,7 +275,7 @@
       if (cb.checked) selectedIds.add(id);
       else            selectedIds.delete(id);
       syncSelectedClass(id, cb.checked);
-      updateBulkToolbar;
+      updateBulkToolbar();
     });
 
     // follow-up: card-tap-to-select. the original author found the
@@ -302,7 +302,7 @@
       if (!id) return;
       // Suppress any anchor-tag default navigation that may have come
       // from a sub-element we didn't explicitly mask.
-      ev.preventDefault;
+      ev.preventDefault();
       // Toggle the Set + the visual state + the in-card checkbox.
       const nowOn = !selectedIds.has(id);
       if (nowOn) selectedIds.add(id);
@@ -310,7 +310,7 @@
       syncSelectedClass(id, nowOn);
       const cb = card.querySelector('input.bulk-check');
       if (cb) cb.checked = nowOn;
-      updateBulkToolbar;
+      updateBulkToolbar();
     });
   }
 
@@ -334,7 +334,7 @@
     return String(s).replace(/[^a-zA-Z0-9_-]/g, c => '\\' + c);
   }
 
-  function hydrateSliders {
+  function hydrateSliders() {
     minScoreEl.value  = state.min_score;
     minQolEl.value    = state.min_qol;
     minSalaryEl.value = state.min_salary;
@@ -346,7 +346,7 @@
   /* =====================================================================
      Drawer (mobile only — desktop CSS overrides position)
      ===================================================================== */
-  function openDrawer {
+  function openDrawer() {
     // Bug fix: the CSS listens for `body.rail-open` on both
     // the filter-rail (`transform: translateX(0)`) and the backdrop
     // (`opacity: 1`). Previously we toggled `.open` on the rail element
@@ -362,23 +362,23 @@
     // `hidden` attr removal.
     void railBackdropEl.offsetWidth;
   }
-  function closeDrawer {
+  function closeDrawer() {
     document.body.classList.remove('rail-open');
     // Defer re-hiding the backdrop from the a11y tree until after the
     // opacity fade completes (matches --dur-2 = 200ms, padded to 240ms).
-    setTimeout( => { railBackdropEl.hidden = true; }, 240);
+    setTimeout(() => { railBackdropEl.hidden = true; }, 240);
   }
 
   /* =====================================================================
      Facet rendering — chips for industries / role_types / etc.
      ===================================================================== */
-  function renderFacets {
+  function renderFacets() {
     if (!taxonomy) return;
-    renderChipFacet('filter-industries',       taxonomy.industries       || , state.industries);
-    renderChipFacet('filter-role-types',       taxonomy.role_types       || , state.role_types);
-    renderChipFacet('filter-company-groups',   taxonomy.company_groups   || , state.company_groups);
-    renderChipFacet('filter-work-modes',       taxonomy.work_modes       || , state.work_modes);
-    renderChipFacet('filter-engagement-types', taxonomy.engagement_types || , state.engagement_types);
+    renderChipFacet('filter-industries',       taxonomy.industries       || [], state.industries);
+    renderChipFacet('filter-role-types',       taxonomy.role_types       || [], state.role_types);
+    renderChipFacet('filter-company-groups',   taxonomy.company_groups   || [], state.company_groups);
+    renderChipFacet('filter-work-modes',       taxonomy.work_modes       || [], state.work_modes);
+    renderChipFacet('filter-engagement-types', taxonomy.engagement_types || [], state.engagement_types);
   }
 
   function renderChipFacet(elId, options, selectedArr) {
@@ -387,7 +387,7 @@
     const sel = new Set(selectedArr);
     ul.innerHTML = options.map(o => {
       const on = sel.has(o.value) ? ' on' : '';
-      return `<li class="${on.trim}" data-value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</li>`;
+      return `<li class="${on.trim()}" data-value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</li>`;
     }).join('');
   }
 
@@ -407,13 +407,13 @@
     else state[facet].push(value);
     li.classList.toggle('on');
     state.offset = 0;
-    reloadFromZero;
+    reloadFromZero();
   });
 
   /* =====================================================================
      Status tabs
      ===================================================================== */
-  function renderStatusTabs {
+  function renderStatusTabs() {
     const opts = (taxonomy && taxonomy.statuses) || [
       { value: 'active', label: 'Active' },
     ];
@@ -422,12 +422,12 @@
       return `<button type="button" class="${cls}" data-status="${escapeHtml(o.value)}">${escapeHtml(o.label)}</button>`;
     }).join('');
     statusTabsEl.querySelectorAll('button').forEach(btn => {
-      btn.addEventListener('click',  => {
+      btn.addEventListener('click', () => {
         state.status = btn.getAttribute('data-status');
         state.offset = 0;
         statusTabsEl.querySelectorAll('button').forEach(b => b.classList.remove('on'));
         btn.classList.add('on');
-        reloadFromZero;
+        reloadFromZero();
       });
     });
   }
@@ -435,7 +435,7 @@
   /* =====================================================================
      Sort dropdown
      ===================================================================== */
-  function renderSortOptions {
+  function renderSortOptions() {
     // Fallback list used only when the /api/taxonomy call fails. Kept in
     // sync with src/lambdas/api_jobs.py::_taxonomy so the dropdown still
     // shows every sort option if the network hiccups during load.
@@ -459,11 +459,11 @@
   /* =====================================================================
      Active filter chips
      ===================================================================== */
-  function renderActiveChips {
-    const chips = ;
+  function renderActiveChips() {
+    const chips = [];
     const labelOf = (facet, value) => {
       if (!taxonomy) return value;
-      const opts = taxonomy[facet] || ;
+      const opts = taxonomy[facet] || [];
       const hit = opts.find(o => o.value === value);
       return hit ? hit.label : value;
     };
@@ -498,7 +498,7 @@
 
     // Wire the × buttons.
     activeChipsEl.querySelectorAll('button[data-clear]').forEach(btn => {
-      btn.addEventListener('click',  => {
+      btn.addEventListener('click', () => {
         const facet = btn.getAttribute('data-facet');
         const value = btn.getAttribute('data-value');
         if (facet === 'q') {
@@ -506,7 +506,7 @@
           // offset 0 instead of just re-rendering loaded rows.
           state.q = '';
           searchInput.value = '';
-          reloadFromZero;
+          reloadFromZero();
           return;
         }
         if (facet === 'min_score') {
@@ -517,10 +517,10 @@
           state.min_salary = 0; minSalaryEl.value = 0; minSalaryOut.textContent = formatSalary(0);
         } else if (Array.isArray(state[facet])) {
           state[facet] = state[facet].filter(x => x !== value);
-          renderFacets;   // refresh chip-cloud "on" classes
+          renderFacets();   // refresh chip-cloud "on" classes
         }
         state.offset = 0;
-        reloadFromZero;
+        reloadFromZero();
       });
     });
   }
@@ -535,8 +535,8 @@
   /* =====================================================================
      URL <-> state
      ===================================================================== */
-  function writeStateToUrl {
-    const sp = new URLSearchParams;
+  function writeStateToUrl() {
+    const sp = new URLSearchParams();
     if (state.status !== 'active') sp.set('status', state.status);
     if (state.industries.length)       sp.set('industries',       state.industries.join(','));
     if (state.role_types.length)       sp.set('role_types',       state.role_types.join(','));
@@ -550,13 +550,13 @@
     if (state.sort_by !== 'score') sp.set('sort_by', state.sort_by);
     if (state.sort_dir !== 'desc') sp.set('sort_dir', state.sort_dir);
     if (state.q) sp.set('q', state.q);
-    const next = location.pathname + (sp.toString ? '?' + sp : '');
+    const next = location.pathname + (sp.toString() ? '?' + sp : '');
     history.replaceState(null, '', next);
   }
 
-  function readStateFromUrl {
+  function readStateFromUrl() {
     const sp = new URLSearchParams(location.search);
-    const arr = (k) => (sp.get(k) || '').split(',').map(s => s.trim).filter(Boolean);
+    const arr = (k) => (sp.get(k) || '').split(',').map(s => s.trim()).filter(Boolean);
     const num = (k, def, lo, hi) => {
       const v = parseInt(sp.get(k), 10);
       if (!Number.isFinite(v)) return def;
@@ -587,30 +587,30 @@
     };
   }
 
-  function resetAll {
-    state = defaultState;
+  function resetAll() {
+    state = defaultState();
     searchInput.value = '';
-    hydrateSliders;
+    hydrateSliders();
     sortSelect.value = state.sort_by;
-    renderFacets;
-    renderStatusTabs;
-    renderActiveChips;
-    reloadFromZero;
+    renderFacets();
+    renderStatusTabs();
+    renderActiveChips();
+    reloadFromZero();
   }
 
   /* =====================================================================
      Fetch helpers
      ===================================================================== */
-  function reloadFromZero {
+  function reloadFromZero() {
     state.offset = 0;
     loadPage({ replace: true });
   }
 
   async function loadPage({ replace }) {
-    if (inflight) inflight.abort;
-    inflight = new AbortController;
+    if (inflight) inflight.abort();
+    inflight = new AbortController();
 
-    const params = new URLSearchParams;
+    const params = new URLSearchParams();
     params.set('status', state.status);
     // q is server-side now.
     if (state.q)                       params.set('q',                state.q);
@@ -627,20 +627,20 @@
     params.set('limit',    state.limit);
     params.set('offset',   state.offset);
 
-    writeStateToUrl;
+    writeStateToUrl();
     showLoading(replace);
 
     try {
-      const data = await fetchJson('/api/jobs/browse?' + params.toString, inflight.signal);
+      const data = await fetchJson('/api/jobs/browse?' + params.toString(), inflight.signal);
       lastResp = data;
       if (replace) {
-        loadedRows = data.jobs || ;
+        loadedRows = data.jobs || [];
       } else {
-        loadedRows = loadedRows.concat(data.jobs || );
+        loadedRows = loadedRows.concat(data.jobs || []);
       }
-      renderJobs;
-      renderActiveChips;
-      updateCounts;
+      renderJobs();
+      renderActiveChips();
+      updateCounts();
       return data;
     } catch (err) {
       if (err.name === 'AbortError') return;
@@ -660,7 +660,7 @@
     resultsCountEl.innerHTML = '<span class="spinner"></span> loading…';
   }
 
-  function updateCounts {
+  function updateCounts() {
     const total     = (lastResp && lastResp.total)     || 0;
     const rawTotal  = (lastResp && lastResp.raw_total) || total;
     const shown     = loadedRows.length;
@@ -688,14 +688,14 @@
   async function fetchJson(path, signal) {
     const r = await fetch(path, { credentials: 'same-origin', signal });
     if (!r.ok) throw new Error('HTTP ' + r.status + ' on ' + path);
-    return r.json;
+    return r.json();
   }
 
   /* =====================================================================
      Card rendering
      ===================================================================== */
   // applyLocalSearch removed; q= is server-side now.
-  function renderJobs {
+  function renderJobs() {
     if (loadedRows.length === 0) {
       jobCardsEl.innerHTML = '';
       emptyStateEl.hidden  = false;
@@ -714,9 +714,9 @@
     const detail = '/job.html?id=' + encodeURIComponent(j.job_id);
 
     // Subtitle row: company + industry + work-mode chip + posted
-    const company = (j.company || '').trim;
+    const company = (j.company || '').trim();
     const companyHref = company ? '/index.html?companies=' + encodeURIComponent(company) : null;
-    const subParts = ;
+    const subParts = [];
     if (companyHref) {
       subParts.push(`<a class="company-link" href="${companyHref}">${escapeHtml(company)}</a>`);
     } else if (company) {
@@ -726,7 +726,7 @@
       subParts.push(`<span class="muted-meta">${escapeHtml(industryLabels(j.industries).join(', '))}</span>`);
     }
     if (j.work_mode && j.work_mode !== 'unclear') {
-      const lbl = j.work_mode.charAt(0).toUpperCase + j.work_mode.slice(1);
+      const lbl = j.work_mode.charAt(0).toUpperCase() + j.work_mode.slice(1);
       subParts.push(`<span class="work-mode-chip wm-${escapeHtml(j.work_mode)}">${escapeHtml(lbl)}</span>`);
     }
     // engagement-type chip — only shown when the detector
@@ -767,7 +767,7 @@
 
     // Tags (role_types + company_group). Industries already shown above
     // so we keep them out of the tag row to avoid duplication.
-    const tagBits = ;
+    const tagBits = [];
     if (j.company_group) {
       tagBits.push(`<span class="tag tag--group">${escapeHtml(facetLabel('company_groups', j.company_group))}</span>`);
     }
@@ -789,7 +789,7 @@
     }
 
     // Top-right metric pills: salary on the left of the score badge.
-    const metricsBits = ;
+    const metricsBits = [];
     if (salaryStr) {
       metricsBits.push(`<span class="metric-pill"><span class="metric-pill__lbl">Comp</span> ${escapeHtml(salaryStr)}</span>`);
     }
@@ -799,7 +799,7 @@
 
     // bulk-select checkbox. Only rendered while select mode is
     // active so the card layout stays unchanged for the normal flow.
-    // We use `data-job-id` (not `name=job_ids`) because the form is
+    // We use `data-job-id` (not `name=job_ids[]`) because the form is
     // never submitted — the JS reads selectedIds directly.
     let checkboxHtml = '';
     if (selectMode) {
@@ -817,7 +817,7 @@
     // that the engine deliberately skipped), we render nothing rather
     // than a placeholder; the score badge already conveys the verdict.
     let semanticHtml = '';
-    const rat = (j.semantic_rationale || '').trim;
+    const rat = (j.semantic_rationale || '').trim();
     if (rat) {
       // dropped the inline "LLM NN" chip that used to sit
       // in front of the rationale. The right-side score badge already
@@ -852,7 +852,7 @@
   // both the in-card industry list and the tag chips.
   function facetLabel(facet, value) {
     if (!taxonomy) return value;
-    const opts = taxonomy[facet] || ;
+    const opts = taxonomy[facet] || [];
     const hit = opts.find(o => o.value === value);
     return hit ? hit.label : value;
   }
@@ -870,20 +870,20 @@
   // confuses the user about what's "armed").
   function setSelectMode(on) {
     selectMode = !!on;
-    selectedIds.clear;
+    selectedIds.clear();
     document.body.classList.toggle('select-mode', selectMode);
     bulkToolbarEl.hidden = !selectMode;
     toggleSelectBtn.setAttribute('aria-pressed', selectMode ? 'true' : 'false');
     const lbl = toggleSelectBtn.querySelector('.select-label');
     if (lbl) lbl.textContent = selectMode ? 'Done' : 'Select';
     // Re-render so cards pick up / drop the checkbox markup.
-    renderJobs;
-    updateBulkToolbar;
+    renderJobs();
+    updateBulkToolbar();
   }
 
   // Refresh the toolbar count text + the disabled state of the Save /
   // Archive buttons. Called after every checkbox change + every render.
-  function updateBulkToolbar {
+  function updateBulkToolbar() {
     const n = selectedIds.size;
     if (bulkCountEl) bulkCountEl.textContent =
       `${n} selected`;
@@ -921,20 +921,20 @@
         credentials: 'same-origin',
       });
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      const data = await r.json;
+      const data = await r.json();
       const msg = data.ok
         ? `${data.updated} ${verb}d`
         : `${data.updated} ${verb}d, ${data.missing.length} missing, ${data.errors.length} errors`;
       toast(msg);
 
       // Selection done — drop it, leave select mode, and reload.
-      selectedIds.clear;
+      selectedIds.clear();
       setSelectMode(false);
-      reloadFromZero;
+      reloadFromZero();
     } catch (err) {
       toast('Bulk ' + verb + ' failed: ' + err.message, { error: true });
       // Re-enable so the original author can retry without leaving select mode.
-      updateBulkToolbar;
+      updateBulkToolbar();
     }
   }
 
@@ -943,10 +943,10 @@
      ===================================================================== */
   function debounce(fn, ms) {
     let t = null;
-    return function  {
+    return function () {
       const args = arguments;
       clearTimeout(t);
-      t = setTimeout( => fn.apply(this, args), ms);
+      t = setTimeout(() => fn.apply(this, args), ms);
     };
   }
   function formatSalary(n) {
@@ -954,4 +954,4 @@
     if (n >= 1000) return '$' + (n / 1000).toFixed(0) + 'k';
     return '$' + n;
   }
-});
+})();

@@ -20,7 +20,7 @@ from pathlib import Path
 import requests
 import yaml
 
-REPO_ROOT     = Path(__file__).resolve.parent.parent
+REPO_ROOT     = Path(__file__).resolve().parent.parent
 COMPANIES_YML = REPO_ROOT / "config" / "companies.yaml"
 
 # Share the canonical User-Agent from src/scrapers/user_agent.py so the
@@ -34,7 +34,7 @@ RATE_LIMIT = 0.5   # Slightly faster since we only make HEAD/GET for discovery.
 
 def _slug_variants(name: str, current: str | None) -> list[str]:
     """Produce candidate slugs to try. Ordered most-to-least likely."""
-    n = name.lower.strip
+    n = name.lower().strip()
     # Strip common company-suffix noise that usually isn't in slugs.
     for suf in (
         " inc.", " inc", " corp.", " corp", " ltd", " llc",
@@ -42,14 +42,14 @@ def _slug_variants(name: str, current: str | None) -> list[str]:
         ", the",
     ):
         if n.endswith(suf):
-            n = n[: -len(suf)].strip
+            n = n[: -len(suf)].strip()
 
     base  = re.sub(r"[^a-z0-9 ]+", "", n)          # strip punctuation
-    parts = base.split
+    parts = base.split()
     joined_hyphen = "-".join(parts)
     joined_none   = "".join(parts)
 
-    candidates: list[str] = 
+    candidates: list[str] = []
     if current:
         candidates.append(current)     # keep current in case it flaps
     candidates.extend([
@@ -60,8 +60,8 @@ def _slug_variants(name: str, current: str | None) -> list[str]:
         (parts[0] + "-" + parts[1]) if len(parts) >= 2 else "",
     ])
     # De-duplicate while preserving order.
-    seen = set
-    out: list[str] = 
+    seen = set()
+    out: list[str] = []
     for c in candidates:
         if c and c not in seen:
             seen.add(c)
@@ -86,11 +86,11 @@ def _probe(ats: str, slug: str) -> tuple[bool, str]:
     if r.status_code != 200:
         return (False, f"{r.status_code}")
     try:
-        data = r.json
+        data = r.json()
     except Exception:
         return (False, "bad-json")
     if ats == "greenhouse":
-        n = len(data.get("jobs") or )
+        n = len(data.get("jobs") or [])
         return (True, f"{n} postings")
     if ats == "lever":
         if not isinstance(data, list):
@@ -105,21 +105,21 @@ def _probe(ats: str, slug: str) -> tuple[bool, str]:
 
 
 def _throttle(last: float) -> float:
-    delay = RATE_LIMIT - (time.time - last)
+    delay = RATE_LIMIT - (time.time() - last)
     if delay > 0:
         time.sleep(delay)
-    return time.time
+    return time.time()
 
 
-def main -> int:
+def main() -> int:
     with COMPANIES_YML.open(encoding="utf-8") as fh:
-        companies = yaml.safe_load(fh).get("companies", )
+        companies = yaml.safe_load(fh).get("companies", [])
 
     targets = [c for c in companies if c.get("ats") in ("greenhouse", "lever", "ashby")]
     print(f"Probing variants for {len(targets)} companies "
           f"(current slug first, then fallbacks)\n")
 
-    suggestions: list[dict] = 
+    suggestions: list[dict] = []
     last_req = 0.0
 
     for c in targets:
@@ -174,7 +174,7 @@ def main -> int:
             print(f"  - name: {r['name']!r}")
             print(f"    ats: {r['found']['ats']}")
             print(f"    ats_slug: {r['found']['slug']!r}    # was {r['current_ats']}/{r['current_slug']!r}")
-            print
+            print()
     if nulls:
         print("\nNo public ATS match — set `ats: null, ats_slug: null`:\n")
         for r in nulls:
@@ -184,4 +184,4 @@ def main -> int:
 
 
 if __name__ == "__main__":
-    main
+    main()

@@ -43,7 +43,7 @@ _WHITESPACE_RE = re.compile(r"\s+")
 def _clean(s: str) -> str:
     if not s:
         return ""
-    return _WHITESPACE_RE.sub(" ", s).strip
+    return _WHITESPACE_RE.sub(" ", s).strip()
 
 
 @register("work_with_indies")
@@ -52,7 +52,7 @@ class WorkWithIndiesScraper(BaseScraper):
     schedule = "cron(30 6 * * ? *)"      # 06:30 UTC daily, with HTML batch
     rate_limit_rps = 1.0
     # 2026-06-03: detail-page descriptions (the listing/card omits the JD).
-    # scrape_run fetches RawJob.url + extracts JSON-LD first, then this
+    # scrape_run() fetches RawJob.url + extracts JSON-LD first, then this
     # CSS selector; populates QoL keyword scoring + the semantic pass.
     auto_fetch_description = True
     _DESC_SELECTOR = 'div.job-description'
@@ -65,7 +65,7 @@ class WorkWithIndiesScraper(BaseScraper):
 
     def fetch(self) -> Iterable[dict]:
         # Single GET — site is single-page, no pagination.
-        self._throttle
+        self._throttle()
         resp = requests.get(
             self.LIST_URL,
             headers={
@@ -74,7 +74,7 @@ class WorkWithIndiesScraper(BaseScraper):
             },
             timeout=30,
         )
-        resp.raise_for_status
+        resp.raise_for_status()
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
@@ -82,7 +82,7 @@ class WorkWithIndiesScraper(BaseScraper):
         # Each anchor sits inside a Webflow .w-dyn-item wrapper. We yield
         # the anchor's outerHTML — it contains the company-logo img, the
         # title, and the location all inside the .job-link-desktop div.
-        seen_hrefs: set[str] = set
+        seen_hrefs: set[str] = set()
         for anchor in soup.find_all("a", class_=re.compile(r"\bjob-card\b"),
                                     href=True):
             href = anchor["href"]
@@ -150,7 +150,7 @@ class WorkWithIndiesScraper(BaseScraper):
         # remote inference. Indies use "Anywhere" or "Remote" liberally.
         remote = None
         if location:
-            lower = location.lower
+            lower = location.lower()
             if "anywhere" in lower or "remote" in lower or "worldwide" in lower:
                 remote = True
             elif "onsite" in lower or "on-site" in lower or "office" in lower:

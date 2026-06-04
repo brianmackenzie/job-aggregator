@@ -55,7 +55,7 @@ class LeverScraper(BaseScraper):
                 continue
 
             url = f"{self.API_BASE}/{slug}"
-            self._throttle
+            self._throttle()
             try:
                 resp = requests.get(
                     url,
@@ -72,8 +72,8 @@ class LeverScraper(BaseScraper):
                         hint="Verify at jobs.lever.co/" + slug,
                     )
                     continue
-                resp.raise_for_status
-                postings = resp.json
+                resp.raise_for_status()
+                postings = resp.json()
             except Exception as exc:
                 # Per the "never hard-fail a scrape run" rule (CLAUDE.md),
                 # a single bad company must NOT kill the rest. Log + skip.
@@ -111,10 +111,10 @@ class LeverScraper(BaseScraper):
           descriptionPlain   → description (preferred; falls back to description HTML)
           hostedUrl          → url
           createdAt          → posted_at (epoch milliseconds)
-          _company_meta      → enrichment from fetch
+          _company_meta      → enrichment from fetch()
         """
         posting_id = payload.get("id")
-        title      = (payload.get("text") or "").strip
+        title      = (payload.get("text") or "").strip()
         if not posting_id or not title:
             return None
 
@@ -132,16 +132,16 @@ class LeverScraper(BaseScraper):
             payload.get("descriptionPlain")
             or payload.get("description")
             or ""
-        ).strip or None
+        ).strip() or None
 
         # Lever timestamps are epoch milliseconds; canonicalize_posted_at
-        # in BaseScraper.normalize handles int / float / ISO8601 strings.
+        # in BaseScraper.normalize() handles int / float / ISO8601 strings.
         created_ms = payload.get("createdAt")
         posted_at  = str(created_ms) if created_ms is not None else None
 
         # Lever sometimes includes a `commitment` field ("Full-time", etc.)
         # and a `workplaceType` in newer API versions ("remote", "hybrid").
-        workplace = (payload.get("workplaceType") or "").lower
+        workplace = (payload.get("workplaceType") or "").lower()
         remote    = True if workplace == "remote" else (
                     False if workplace == "onsite" else None
                     )
@@ -163,7 +163,7 @@ class LeverScraper(BaseScraper):
 
     def normalize(self, job: RawJob) -> dict:
         """Inject company_tier into the row for scoring modifiers."""
-        row = super.normalize(job)
+        row = super().normalize(job)
         if job.raw:
             tier = job.raw.get("company_tier")
             if tier:
